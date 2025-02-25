@@ -5,6 +5,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 def save_dataframes(name, json_path, output_path):
     images_df = pd.DataFrame()
@@ -20,9 +21,9 @@ def save_dataframes(name, json_path, output_path):
 
 
 def main():
-    #val_file = r'/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfrontv2/Valid.json'
-    #val_output = 'Data Analysis/DataOutputs/'
-    #save_dataframes('Valid', val_file, val_output)
+    val_file = r'/home/xander/Documents/School/p4/P4/Data Analysis/Train.json'
+    val_output = 'Data Analysis/DataOutputs/'
+    save_dataframes('Train', val_file, val_output)
     
     df = pd.read_csv('Data Analysis/DataOutputs/Valid_images.csv', index_col=0)
     #print(df.columns)
@@ -62,10 +63,17 @@ def main():
     
     print(df_meta['time_captured'])
 
-    plt.scatter(x=df_meta['day_captured'], y=df_meta['Temperature'])
-
-    plt.show()
+    #plt.scatter(df_meta['date_captured'], df_meta['Min of sunshine latest 10 min'])
+    #plt.xlabel("Temperature")
+    #plt.ylabel("Humidity")
+    #plt.title("Temperature vs. Humidity")
+    #plt.savefig("scatter_plot_Temp_v_Humid")
+    #plt.show()
     
+    sns.scatterplot(data=df_meta, x="Wind Direction", y="Wind Speed", hue="Precipitation latest 10 min")
+    #plt.savefig("sns_scatterplot_WindD_v_WindS_Precipation")
+    plt.show()
+
     # Things to plot hahhahahahahah
     # Temp
     # Humidity
