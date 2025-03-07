@@ -29,37 +29,38 @@ def train(args, params):
     model = nn.yolo_v8_n(len(params['names'].values())).cuda()
 
     # Optimizer
-    # accumulate = max(round(64 / (args.batch_size * args.world_size)), 1)
-    # params['weight_decay'] *= args.batch_size * args.world_size * accumulate / 64
+    accumulate = max(round(64 / (args.batch_size * args.world_size)), 1)
+    params['weight_decay'] *= args.batch_size * args.world_size * accumulate / 64
 
-    # p = [], [], []
-    # for v in model.modules():
-    #     if hasattr(v, 'bias') and isinstance(v.bias, torch.nn.Parameter):
-    #         p[2].append(v.bias)
-    #     if isinstance(v, torch.nn.BatchNorm2d):
-    #         p[1].append(v.weight)
-    #     elif hasattr(v, 'weight') and isinstance(v.weight, torch.nn.Parameter):
-    #         p[0].append(v.weight)
+    p = [], [], []
+    for v in model.modules():
+        if hasattr(v, 'bias') and isinstance(v.bias, torch.nn.Parameter):
+            p[2].append(v.bias)
+        if isinstance(v, torch.nn.BatchNorm2d):
+            p[1].append(v.weight)
+        elif hasattr(v, 'weight') and isinstance(v.weight, torch.nn.Parameter):
+            p[0].append(v.weight)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    optimizer = torch.optim.SGD(p[2], params['lr0'], params['momentum'], nesterov=True)
 
-    # optimizer.add_param_group({'params': p[0], 'weight_decay': params['weight_decay']})
-    # optimizer.add_param_group({'params': p[1]})
-    # del p
+    optimizer.add_param_group({'params': p[0], 'weight_decay': params['weight_decay']})
+    optimizer.add_param_group({'params': p[1]})
+    del p
 
     # Scheduler
-    # lr = learning_rate(args, params)
-    # scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr, last_epoch=-1)
+    lr = learning_rate(args, params)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr, last_epoch=-1)
 
     # EMA
-    # ema = util.EMA(model) if args.local_rank == 0 else None
+    ema = util.EMA(model) if args.local_rank == 0 else None
 
     filenames = []
-    with open('train.txt') as reader:
+    with open('Data/train.txt') as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
             filenames.append('/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/' + filename)
-    dataset = Dataset(filenames, args.input_size, params, True, augment=False)
+
+    dataset = Dataset(filenames, args.input_size, params, True)
 
     if args.world_size <= 1:
         sampler = None
@@ -107,7 +108,6 @@ def train(args, params):
                 x = i + num_batch * epoch  # number of iterations
                 samples = samples.cuda().float() / 255
                 targets = targets.cuda()
-                
 
                 # Warmup
                 if x <= num_warmup:
@@ -128,8 +128,6 @@ def train(args, params):
                 with torch.cuda.amp.autocast():
                     outputs = model(samples)  # forward
                 loss = criterion(outputs, targets)
-
-                print(f"For epoch: {epoch} and batch: {i}, the loss is: {loss}")
 
                 m_loss.update(loss.item(), samples.size(0))
 
@@ -288,7 +286,7 @@ def test(args, params, model=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-size', default=640, type=int)
-    parser.add_argument('--batch-size', default=32, type=int)
+    parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--local_rank', default=0, type=int)
     parser.add_argument('--epochs', default=500, type=int)
     parser.add_argument('--train', action='store_true')
@@ -312,8 +310,7 @@ def main():
 
     with open(os.path.join('utils', 'args.yaml'), errors='ignore') as f:
         params = yaml.safe_load(f)
-    
-    #if args.train:
+
     train(args, params)
     if args.test:
         test(args, params)
