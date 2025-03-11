@@ -204,8 +204,8 @@ class YOLO(torch.nn.Module):
         super().__init__()
         self.net = DarkNet(width, depth)
         self.fpn = DarkFPN(width, depth)
-        #img_dummy = torch.zeros(1, 1, 256, 256)
-        img_dummy = torch.zeros(1, 3, 256, 256)
+        img_dummy = torch.zeros(1, 1, 256, 256)
+        #img_dummy = torch.zeros(1, 3, 256, 256)
         self.head = Head(num_classes, (width[3], width[4], width[5]))
         self.head.stride = torch.tensor([256 / x.shape[-2] for x in self.forward(img_dummy)])
         self.stride = self.head.stride
@@ -225,31 +225,31 @@ class YOLO(torch.nn.Module):
         return self
 
 
-def yolo_v8_n(num_classes: int = 80):
+def yolo_v8_n(num_classes: int = 4):
     depth = [1, 2, 2]
-    width = [3, 16, 32, 64, 128, 256]
+    width = [1, 16, 32, 64, 128, 256]
     return YOLO(width, depth, num_classes)
 
 
-def yolo_v8_s(num_classes: int = 80):
+def yolo_v8_s(num_classes: int = 4):
     depth = [1, 2, 2]
-    width = [3, 32, 64, 128, 256, 512]
+    width = [1, 32, 64, 128, 256, 512]
     return YOLO(width, depth, num_classes)
 
 
-def yolo_v8_m(num_classes: int = 80):
+def yolo_v8_m(num_classes: int = 4):
     depth = [2, 4, 4]
-    width = [3, 48, 96, 192, 384, 576]
+    width = [1, 48, 96, 192, 384, 576]
     return YOLO(width, depth, num_classes)
 
 
-def yolo_v8_l(num_classes: int = 80):
+def yolo_v8_l(num_classes: int = 4):
     depth = [3, 6, 6]
-    width = [3, 64, 128, 256, 512, 512]
+    width = [1, 64, 128, 256, 512, 512]
     return YOLO(width, depth, num_classes)
 
 
-def yolo_v8_x(num_classes: int = 80):
+def yolo_v8_x(num_classes: int = 4):
     depth = [3, 6, 6]
-    width = [3, 80, 160, 320, 640, 640]
+    width = [1, 80, 160, 320, 640, 640]
     return YOLO(width, depth, num_classes)

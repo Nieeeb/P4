@@ -1,3 +1,4 @@
+# Modified from: https://github.com/jahongir7174/YOLOv8-pt
 import math
 import os
 import random
@@ -8,6 +9,7 @@ import torch
 from PIL import Image
 from torch.utils import data
 from tqdm import tqdm
+from onlinetools import 
 
 FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'
 
@@ -34,77 +36,93 @@ class Dataset(data.Dataset):
         index = self.indices[index]
 
         params = self.params
-        mosaic = self.mosaic and random.random() < params['mosaic']
+        # mosaic = self.mosaic and random.random() < params['mosaic']
 
-        if mosaic:
-            shapes = None
-            # Load MOSAIC
-            image, label = self.load_mosaic(index, params)
-            # MixUp augmentation
-            if random.random() < params['mix_up']:
-                index = random.choice(self.indices)
-                mix_image1, mix_label1 = image, label
-                mix_image2, mix_label2 = self.load_mosaic(index, params)
+        # if mosaic:
+        #     shapes = None
+        #     # Load MOSAIC
+        #     image, label = self.load_mosaic(index, params)
+        #     # MixUp augmentation
+        #     if random.random() < params['mix_up']:
+        #         index = random.choice(self.indices)
+        #         mix_image1, mix_label1 = image, label
+        #         mix_image2, mix_label2 = self.load_mosaic(index, params)
 
-                image, label = mix_up(mix_image1, mix_label1, mix_image2, mix_label2)
-        else:
+        #         image, label = mix_up(mix_image1, mix_label1, mix_image2, mix_label2)
+        # else:
+        if True:
             # Load image
             image, shape = self.load_image(index)
             h, w = image.shape[:2]
+            #h, w = image.size
 
             # Resize
             image, ratio, pad = resize(image, self.input_size, self.augment)
+            
             shapes = shape, ((h / shape[0], w / shape[1]), pad)  # for COCO mAP rescaling
 
             label = self.labels[index].copy()
             if label.size:
                 label[:, 1:] = wh2xy(label[:, 1:], ratio[0] * w, ratio[1] * h, pad[0], pad[1])
-            if self.augment:
-                image, label = random_perspective(image, label, params)
+            # if self.augment:
+            #     image, label = random_perspective(image, label, params)
         nl = len(label)  # number of labels
         if nl:
             label[:, 1:5] = xy2wh(label[:, 1:5], image.shape[1], image.shape[0])
+            #label[:, 1:5] = xy2wh(label[:, 1:5], image.size[1], image.size[0])
 
-        if self.augment:
-            # Albumentations
-            image, label = self.albumentations(image, label)
-            nl = len(label)  # update after albumentations
-            # HSV color-space
-            augment_hsv(image, params)
-            # Flip up-down
-            if random.random() < params['flip_ud']:
-                image = numpy.flipud(image)
-                if nl:
-                    label[:, 2] = 1 - label[:, 2]
-            # Flip left-right
-            if random.random() < params['flip_lr']:
-                image = numpy.fliplr(image)
-                if nl:
-                    label[:, 1] = 1 - label[:, 1]
+        # if self.augment:
+        #     # Albumentations
+        #     image, label = self.albumentations(image, label)
+        #     nl = len(label)  # update after albumentations
+        #     # HSV color-space
+        #     augment_hsv(image, params)
+        #     # Flip up-down
+        #     if random.random() < params['flip_ud']:
+        #         image = numpy.flipud(image)
+        #         if nl:
+        #             label[:, 2] = 1 - label[:, 2]
+        #     # Flip left-right
+        #     if random.random() < params['flip_lr']:
+        #         image = numpy.fliplr(image)
+        #         if nl:
+        #             label[:, 1] = 1 - label[:, 1]
 
         target = torch.zeros((nl, 6))
         if nl:
             target[:, 1:] = torch.from_numpy(label)
 
         # Convert HWC to CHW, BGR to RGB
-        sample = image.transpose((2, 0, 1))[::-1]
-        sample = numpy.ascontiguousarray(sample)
+        #sample = image.transpose((2, 0, 1))[::-1]
+        #sample = numpy.ascontiguousarray(sample)
+        sample = numpy.ascontiguousarray(image)
+        sample = torch.from_numpy(sample)
+        sample = sample.unsqueeze(0)
         
         #print(sample.shape)
-
-        return torch.from_numpy(sample), target, shapes
+        #return pil_to_tensor(image), target, shapes
+        return sample, target, shapes
+        #return torch.from_numpy(sample), target, shapes
 
     def __len__(self):
         return len(self.filenames)
 
     def load_image(self, i):
-        image = cv2.imread(self.filenames[i])
+        if self.params['online']:
+            print("ONLINE TRAINING")
+        else:
+            image = cv2.imread(self.filenames[i], cv2.IMREAD_UNCHANGED)
         h, w = image.shape[:2]
         r = self.input_size / max(h, w)
         if r != 1:
             image = cv2.resize(image,
                                dsize=(int(w * r), int(h * r)),
                                interpolation=resample() if self.augment else cv2.INTER_LINEAR)
+        # image = Image.open(self.filenames[i])
+        # h, w = image.size
+        # r = self.input_size / max(h, w)
+        # if r != 1:
+        #     image = image.resize(size=(int(w * r), int(h * r)))
         return image, (h, w)
 
     def load_mosaic(self, index, params):
@@ -123,7 +141,8 @@ class Dataset(data.Dataset):
         for i, index in enumerate(indices):
             # Load image
             image, _ = self.load_image(index)
-            shape = image.shape
+            #shape = image.shape
+            shape = image.size
             if i == 0:  # top left
                 x1a = max(xc - shape[1], 0)
                 y1a = max(yc - shape[0], 0)
@@ -291,6 +310,7 @@ def augment_hsv(image, params):
 def resize(image, input_size, augment):
     # Resize and pad image while meeting stride-multiple constraints
     shape = image.shape[:2]  # current shape [height, width]
+    #shape = image.size
 
     # Scale ratio (new / old)
     r = min(input_size / shape[0], input_size / shape[1])
@@ -308,7 +328,7 @@ def resize(image, input_size, augment):
                            interpolation=resample() if augment else cv2.INTER_LINEAR)
     top, bottom = int(round(h - 0.1)), int(round(h + 0.1))
     left, right = int(round(w - 0.1)), int(round(w + 0.1))
-    image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT)  # add border
+    #image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT)  # add border
     return image, (r, r), (w, h)
 
 

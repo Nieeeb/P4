@@ -1,3 +1,4 @@
+# Modified from: https://github.com/jahongir7174/YOLOv8-pt
 import argparse
 import copy
 import csv
@@ -15,6 +16,12 @@ from utils import util
 from utils.dataset import Dataset
 
 warnings.filterwarnings("ignore")
+
+
+
+
+
+
 
 
 def learning_rate(args, params):
@@ -60,7 +67,7 @@ def train(args, params):
             filename = filename.rstrip().split('/')[-1]
             filenames.append('/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/' + filename)
 
-    dataset = Dataset(filenames, args.input_size, params, True)
+    dataset = Dataset(filenames, args.input_size, params, False)
 
     if args.world_size <= 1:
         sampler = None
@@ -285,8 +292,8 @@ def test(args, params, model=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-size', default=640, type=int)
-    parser.add_argument('--batch-size', default=16, type=int)
+    parser.add_argument('--input-size', default=384, type=int)
+    parser.add_argument('--batch-size', default=8, type=int)
     parser.add_argument('--local_rank', default=0, type=int)
     parser.add_argument('--epochs', default=500, type=int)
     parser.add_argument('--train', action='store_true')
