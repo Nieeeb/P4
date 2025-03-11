@@ -17,6 +17,7 @@ def setup_seed():
     random.seed(0)
     numpy.random.seed(0)
     torch.manual_seed(0)
+    #benchmark gør så den finder den bedste algoritme (SKAL ALTID VÆRE FALSE)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
