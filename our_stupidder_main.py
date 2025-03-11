@@ -3,16 +3,20 @@ from nets.nn import yolo_v8_n
 from utils.dataset import Dataset
 import argparse
 import os
+import warnings
 import torch
 from utils import util
 from torch.utils import data
 import tqdm
+import wandb
+
+warnings.filterwarnings("ignore")
 
 
 def main(): 
     #Loading args from CLI
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-size', default=640, type=int)
+    parser.add_argument('--input-size', default=384, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--local_rank', default=0, type=int)
     parser.add_argument('--epochs', default=500, type=int)
@@ -33,16 +37,18 @@ def main():
     util.setup_seed()
 
     #Loading config
-    with open(r'utils\args.yaml') as cf_file:
+    with open(r'utils/args.yaml') as cf_file:
         params = yaml.safe_load( cf_file.read())
+        
+    train(args, params)
 
 
 
 
 def train(args, params):
-
     #Loading model
     model = yolo_v8_n(len(params.get("names")))
+    model = model.cuda()
 
     #Dataloading
     filenames = []
@@ -51,7 +57,7 @@ def train(args, params):
             filename = filename.rstrip().split('/')[-1]
             filenames.append('/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/' + filename)
 
-    dataset = Dataset(filenames, args.input_size, params, True, augment=False)
+    dataset = Dataset(filenames, args.input_size, params, augment=False)
 
 
     if args.world_size <= 1:
@@ -70,17 +76,26 @@ def train(args, params):
                                                             device_ids=[args.local_rank],
                                                             output_device=args.local_rank)
     criterion = util.ComputeLoss(model, params)
-    optimizer = torch.optim.Adam(model.parameters, lr=0.002)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
 
     #Model set to train
     model.train()
     num_batch = len(loader)
+    
+    # Init Wandb
+    wandb.init(
+        project="Thermal",
+        config=params
+    )
+    
     for epoch in range(args.epochs):
 
+        m_loss = util.AverageMeter()
 
         if args.world_size > 1:
             sampler.set_epoch(epoch)
-            p_bar = enumerate(loader)
+            
+        p_bar = enumerate(loader)
         if args.local_rank == 0:
             print(('\n' + '%10s' * 3) % ('epoch', 'memory', 'loss'))
         if args.local_rank == 0:
@@ -95,13 +110,29 @@ def train(args, params):
             outputs = model(samples)  # forward
             loss = criterion(outputs, targets)
 
+            m_loss.update(loss.item(), samples.size(0))
+
+
             loss *= args.batch_size  # loss scaled by batch_size
             loss *= args.world_size  # gradient averaged between devices in DDP mode
 
             loss.backward()
+            
+            wandb.log(
+                {"Training loss": m_loss.avg}
+            )
+            
+            del loss
+
 
             optimizer.step()
 
+
+            # Log
+            if args.local_rank == 0:
+                memory = f'{torch.cuda.memory_reserved() / 1E9:.3g}G'  # (GB)
+                s = ('%10s' * 2 + '%10.4g') % (f'{epoch + 1}/{args.epochs}', memory, m_loss.avg)
+                p_bar.set_description(s)
 
 
 
