@@ -1,5 +1,8 @@
 wandb/
 secrets/
+Data/Images
+Data/Labels
+runs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

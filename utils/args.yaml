@@ -19,7 +19,8 @@ flip_ud: 0.0000               # image flip up-down (probability)
 flip_lr: 0.5000               # image flip left-right (probability)
 mosaic: 1.00000               # image mosaic (probability)
 mix_up: 0.00000               # image mix-up (probability)
-online: False
+online: False                 # If Data should be pulled from online datastore or is stored locally
+checkpoint_path: "runs/run0"  # Path to save model checkpoints
 # classes
 names:
   0: person

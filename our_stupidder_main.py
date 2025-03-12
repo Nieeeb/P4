@@ -1,5 +1,5 @@
 import yaml
-from nets.nn import yolo_v8_n
+from nets.nn import yolo_v8_m
 from utils.dataset import Dataset
 import argparse
 import os
@@ -9,9 +9,9 @@ from utils import util
 from torch.utils import data
 import tqdm
 import wandb
+from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
 
 warnings.filterwarnings("ignore")
-
 
 def main(): 
     #Loading args from CLI
@@ -19,7 +19,7 @@ def main():
     parser.add_argument('--input-size', default=384, type=int)
     parser.add_argument('--batch-size', default=16, type=int)
     parser.add_argument('--local_rank', default=0, type=int)
-    parser.add_argument('--epochs', default=500, type=int)
+    parser.add_argument('--epochs', default=100, type=int)
     parser.add_argument('--train', action='store_true')
     parser.add_argument('--test', action='store_true')
 
@@ -47,26 +47,59 @@ def main():
 
 def train(args, params):
     #Loading model
-    model = yolo_v8_n(len(params.get("names")))
-    model = model.cuda()
+    checkpoint_path = params.get('checkpoint_path')
+    starting_epoch = 0
+    if check_checkpoint(checkpoint_path):
+        model, optimizer, scheduler, starting_epoch = load_latest_checkpoint(checkpoint_path)
+        print(f"Checkpoint found, starting from epoch {epoch}")
+    else:
+        print("No checkpoint found, starting new training")
+        starting_epoch = 0
+        model = yolo_v8_m(len(params.get('names')))
+        model = model.cuda()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
 
-    #Dataloading
+    
+    #Dataloading train 
     filenames = []
     with open('Data/train.txt') as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
             filenames.append('/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/' + filename)
 
-    dataset = Dataset(filenames, args.input_size, params, augment=False)
+    train_dataset = Dataset(filenames, args.input_size, params, augment=False)
 
 
     if args.world_size <= 1:
-        sampler = None
+        train_sampler = None
     else:
-        sampler = data.distributed.DistributedSampler(dataset)
+        train_sampler = data.distributed.DistributedSampler(train_dataset)
 
-    loader = data.DataLoader(dataset, args.batch_size, sampler,
+    train_loader = data.DataLoader(train_dataset, args.batch_size, train_sampler,
                              num_workers=8, pin_memory=True, collate_fn=Dataset.collate_fn)
+
+
+    #Dataloading Validation
+    filenames = []
+    with open('Data/val.txt') as reader:
+        for filename in reader.readlines():
+            filename = filename.rstrip().split('/')[-1]
+            filenames.append("/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/valid/" + filename)
+
+    validation_dataset = Dataset(filenames, args.input_size, params, augment=False)
+
+
+    if args.world_size <= 1:
+        validation_sampler = None
+    else:
+        validation_sampler = data.distributed.DistributedSampler(validation_dataset)
+
+    validation_loader = data.DataLoader(validation_dataset, args.batch_size, validation_sampler,
+                             num_workers=8, pin_memory=True, collate_fn=Dataset.collate_fn)
+
+    
+
 
 
     if args.world_size > 1:
@@ -76,11 +109,10 @@ def train(args, params):
                                                             device_ids=[args.local_rank],
                                                             output_device=args.local_rank)
     criterion = util.ComputeLoss(model, params)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
 
-    #Model set to train
-    model.train()
-    num_batch = len(loader)
+    num_batch = len(train_loader)
+
+    #num_val_batch = len(validation_loader)
     
     # Init Wandb
     wandb.init(
@@ -88,24 +120,29 @@ def train(args, params):
         config=params
     )
     
-    for epoch in range(args.epochs):
+    for epoch in range(starting_epoch, args.epochs):
 
         m_loss = util.AverageMeter()
 
         if args.world_size > 1:
-            sampler.set_epoch(epoch)
+            train_sampler.set_epoch(epoch)
             
-        p_bar = enumerate(loader)
+        p_bar = enumerate(train_loader)
         if args.local_rank == 0:
-            print(('\n' + '%10s' * 3) % ('epoch', 'memory', 'loss'))
+            print(('\n' + '%10s' * 3) % ('epoch', 'memory', 'train_loss'))
         if args.local_rank == 0:
             p_bar = tqdm.tqdm(p_bar, total=num_batch)  # progress bar
 
         for _, (samples, targets, _) in p_bar:
+            #Model set to train
+            model.train()
+            
             optimizer.zero_grad()
 
             samples = samples.cuda().float() / 255
             targets = targets.cuda()
+
+            #print(f"Train shape: {samples.shape} and {targets.shape}")
 
             outputs = model(samples)  # forward
             loss = criterion(outputs, targets)
@@ -133,6 +170,44 @@ def train(args, params):
                 memory = f'{torch.cuda.memory_reserved() / 1E9:.3g}G'  # (GB)
                 s = ('%10s' * 2 + '%10.4g') % (f'{epoch + 1}/{args.epochs}', memory, m_loss.avg)
                 p_bar.set_description(s)
+            
+    
+        #Validation
+        #model.eval()
+        #p_bar = enumerate(validation_loader)
+
+        #if args.local_rank == 0:
+        #        p_bar = tqdm.tqdm(p_bar, total=num_val_batch)  # progress bar
+
+        running_vloss = 0.0
+
+        with torch.no_grad():
+            for _, (samples, targets, _) in enumerate(validation_loader):
+                
+                samples = samples.cuda().float() / 255
+                targets = targets.cuda()
+
+                #print(f"Val shape: {samples.shape} and {targets.shape}")
+                
+                outputs = model(samples)
+                vloss = criterion(outputs, targets)
+                running_vloss += vloss
+
+        avg_vloss = running_vloss / (len(p_bar) + 1)
+
+        #print(f"Validation loss for epoch {epoch} is: {avg_vloss}")
+        wandb.log({
+            'Validation Loss': avg_vloss
+        })
+        
+        del avg_vloss
+        del running_vloss
+        
+        # Step learning rate scheduler
+        scheduler.step()
+        
+        # Saving checkpoint
+        save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path)
 
 
 
