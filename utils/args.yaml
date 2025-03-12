@@ -22,7 +22,9 @@ dfl: 1.5                      # cls loss gain
 online: False                 # If Data should be pulled from online datastore or is stored locally
 checkpoint_path: "runs/run0"  # Path to save model checkpoints
 train_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/"
+train_txt: "Data/train.txt"
 val_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/val/"
+val_txt: "Data/val.txt"
 # classes
 names:
   0: person

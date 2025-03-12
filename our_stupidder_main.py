@@ -63,7 +63,7 @@ def train(args, params):
     
     #Dataloading train 
     filenames = []
-    with open('Data/train.txt') as reader:
+    with open(params.get('train_txt')) as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
             filenames.append(params.get('train_imgs') + filename)
@@ -82,7 +82,7 @@ def train(args, params):
 
     #Dataloading Validation
     filenames = []
-    with open('Data/val.txt') as reader:
+    with open(params.get('val_text')) as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
             filenames.append(params.get('val_imgs') + filename)
