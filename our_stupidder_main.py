@@ -66,7 +66,7 @@ def train(args, params):
     with open('Data/train.txt') as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
-            filenames.append('/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/' + filename)
+            filenames.append(params.get('train_imgs') + filename)
 
     train_dataset = Dataset(filenames, args.input_size, params, augment=False)
 
@@ -85,7 +85,7 @@ def train(args, params):
     with open('Data/val.txt') as reader:
         for filename in reader.readlines():
             filename = filename.rstrip().split('/')[-1]
-            filenames.append("/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/valid/" + filename)
+            filenames.append(params.get('val_imgs') + filename)
 
     validation_dataset = Dataset(filenames, args.input_size, params, augment=False)
 

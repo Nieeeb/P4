@@ -1,6 +1,8 @@
 wandb/
 secrets/
 Data/Images
+Data/images
+Data/labels
 Data/Labels
 runs/
 

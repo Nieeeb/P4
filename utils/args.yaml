@@ -21,6 +21,8 @@ dfl: 1.5                      # cls loss gain
 #mix_up: 0.00000               # image mix-up (probability)
 online: False                 # If Data should be pulled from online datastore or is stored locally
 checkpoint_path: "runs/run0"  # Path to save model checkpoints
+train_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/"
+val_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/val/"
 # classes
 names:
   0: person
