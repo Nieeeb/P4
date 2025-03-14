@@ -27,12 +27,20 @@ def main():
 
     #args for DDP
     args.local_rank = int(os.getenv('LOCAL_RANK', 0))
+    print(f"Local rank: {args.local_rank}")
     #Vi kan prøve det sådan her og hvis AI-LAB ikke har world_size system variabel kan vi bare sætte default til 8
-    args.world_size = int(os.getenv('WORLD_SIZE', 1))
+    #args.world_size = int(os.getenv('WORLD_SIZE', 1))
+    args.world_size = torch.cuda.device_count()
+    print(f"World size: {args.world_size}")
 
     if args.world_size > 1:
+        os.environ["MASTER_ADDR"] = 'localhost'
+        os.environ["MASTER_PORT"] = "12355"
+
+        # Initialize the process group
+        torch.distributed.init_process_group("gloo", rank=args.local_rank, world_size=args.world_size)
         torch.cuda.set_device(device=args.local_rank)
-        torch.distributed.init_process_group(backend='nccl', init_method='env://')
+        #torch.distributed.init_process_group(backend='nccl', init_method='env://')
 
     util.setup_seed()
 
@@ -41,7 +49,10 @@ def main():
         params = yaml.safe_load( cf_file.read())
         
     train(args, params)
-
+    
+    if args.world_size > 1:
+        "Cleans up the distributed environment"
+        torch.distributed.destroy_process_group()
 
 
 
@@ -57,7 +68,7 @@ def train(args, params):
         starting_epoch = 0
         model = yolo_v8_m(len(params.get('names')))
         model = model.cuda()
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
 
     
