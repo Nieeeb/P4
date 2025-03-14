@@ -34,29 +34,26 @@ def main():
     args.world_size = torch.cuda.device_count()
     print(f"World size: {args.world_size}")
 
-    if args.world_size > 1:
-        os.environ["MASTER_ADDR"] = 'localhost'
-        os.environ["MASTER_PORT"] = "12355"
-
-        # Initialize the process group
-        torch.distributed.init_process_group(backend="nccl", rank=args.local_rank, world_size=args.world_size)
-        torch.cuda.set_device(device=args.local_rank)
-
     util.setup_seed()
 
     #Loading config
     with open(r'utils/args.yaml') as cf_file:
         params = yaml.safe_load( cf_file.read())
         
-    mp.spawn(train(args, params), args=(args.world_size), nprocs=args.world_size, join=True)
+    mp.spawn(train(args,params), nprocs=args.world_size, join=True)
     
     if args.world_size > 1:
         "Cleans up the distributed environment"
         torch.distributed.destroy_process_group()
 
-
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
 
 def train(args, params):
+    setup(args.local_rank, args.world_size)
     #Loading model
     checkpoint_path = params.get('checkpoint_path')
     starting_epoch = 0
