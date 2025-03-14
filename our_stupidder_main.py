@@ -10,6 +10,7 @@ from torch.utils import data
 import tqdm
 import wandb
 from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
+import torch.multiprocessing as mp
 
 warnings.filterwarnings("ignore")
 
@@ -38,9 +39,8 @@ def main():
         os.environ["MASTER_PORT"] = "12355"
 
         # Initialize the process group
-        torch.distributed.init_process_group("gloo", rank=args.local_rank, world_size=args.world_size)
+        torch.distributed.init_process_group(backend="nccl", rank=args.local_rank, world_size=args.world_size)
         torch.cuda.set_device(device=args.local_rank)
-        #torch.distributed.init_process_group(backend='nccl', init_method='env://')
 
     util.setup_seed()
 
@@ -48,7 +48,7 @@ def main():
     with open(r'utils/args.yaml') as cf_file:
         params = yaml.safe_load( cf_file.read())
         
-    train(args, params)
+    mp.spawn(train(args, params), args=(args.world_size), nprocs=args.world_size, join=True)
     
     if args.world_size > 1:
         "Cleans up the distributed environment"
@@ -67,7 +67,7 @@ def train(args, params):
         print("No checkpoint found, starting new training")
         starting_epoch = 0
         model = yolo_v8_m(len(params.get('names')))
-        model = model.cuda()
+        model = model.to(args.local_rank)
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
 
@@ -85,7 +85,8 @@ def train(args, params):
     if args.world_size <= 1:
         train_sampler = None
     else:
-        train_sampler = data.distributed.DistributedSampler(train_dataset)
+        train_sampler = data.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=args.local_rank)
+        train_loader.set_epoch(starting_epoch)
 
     train_loader = data.DataLoader(train_dataset, args.batch_size, train_sampler,
                              num_workers=8, pin_memory=True, collate_fn=Dataset.collate_fn)
@@ -104,7 +105,8 @@ def train(args, params):
     if args.world_size <= 1:
         validation_sampler = None
     else:
-        validation_sampler = data.distributed.DistributedSampler(validation_dataset)
+        validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank)
+        validation_sampler.set_epoch(starting_epoch)
 
     validation_loader = data.DataLoader(validation_dataset, args.batch_size, validation_sampler,
                              num_workers=8, pin_memory=True, collate_fn=Dataset.collate_fn)
@@ -140,18 +142,19 @@ def train(args, params):
             
         p_bar = enumerate(train_loader)
         if args.local_rank == 0:
-            print(('\n' + '%10s' * 3) % ('epoch', 'memory', 'train_loss'))
+            print(('\n' + '%10s' * 3) % ('epoch', 'memory', '    train_loss'))
         if args.local_rank == 0:
             p_bar = tqdm.tqdm(p_bar, total=num_batch)  # progress bar
 
         for _, (samples, targets, _) in p_bar:
+            samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
             #Model set to train
             model.train()
             
             optimizer.zero_grad()
 
-            samples = samples.cuda().float() / 255
-            targets = targets.cuda()
+            samples = samples.float() / 255
+            #targets = targets.cuda()
 
             #print(f"Train shape: {samples.shape} and {targets.shape}")
 
