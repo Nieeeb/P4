@@ -84,7 +84,7 @@ def train(args, params):
         train_sampler = None
     else:
         train_sampler = data.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=args.local_rank)
-        train_loader.set_epoch(starting_epoch)
+        train_sampler.set_epoch(starting_epoch)
 
     train_loader = data.DataLoader(train_dataset, params.get('batch_size'), sampler=train_sampler,
                              num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, shuffle=True)
@@ -118,7 +118,7 @@ def train(args, params):
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
             model = torch.nn.parallel.DistributedDataParallel(module=model,
                                                             device_ids=[args.local_rank],
-                                                            output_device=args.local_rank)
+                                                            ) #output_device=args.local_rank
     criterion = util.ComputeLoss(model, params)
 
     num_batch = len(train_loader)
