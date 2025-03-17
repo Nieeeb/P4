@@ -41,7 +41,7 @@ def main():
     with open(args.args_file) as cf_file:
         params = yaml.safe_load( cf_file.read())
         
-    mp.spawn(train(args,params), nprocs=args.world_size, join=True)
+    mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
     
     if args.world_size > 1:
         "Cleans up the distributed environment"
@@ -53,8 +53,9 @@ def setup(rank, world_size):
     torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
     torch.cuda.set_device(rank)
 
-def train(args, params):
-    setup(args.local_rank, args.world_size)
+def train(rank, args, params):
+    args.local_rank = rank
+    setup(rank, args.world_size)
     #Loading model
     checkpoint_path = params.get('checkpoint_path')
     starting_epoch = 0
