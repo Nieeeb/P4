@@ -17,12 +17,13 @@ warnings.filterwarnings("ignore")
 def main(): 
     #Loading args from CLI
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-size', default=384, type=int)
-    parser.add_argument('--batch-size', default=16, type=int)
-    parser.add_argument('--local_rank', default=0, type=int)
-    parser.add_argument('--epochs', default=100, type=int)
-    parser.add_argument('--train', action='store_true')
-    parser.add_argument('--test', action='store_true')
+    #parser.add_argument('--input-size', default=384, type=int)
+    #parser.add_argument('--batch-size', default=96, type=int)
+    #parser.add_argument('--local_rank', default=0, type=int)
+    #parser.add_argument('--epochs', default=100, type=int)
+    #parser.add_argument('--train', action='store_true')
+    #parser.add_argument('--test', action='store_true')
+    parser.add_argument('--args_file', default='utils/args.yaml', type=str)
 
     args = parser.parse_args()
 
@@ -37,7 +38,7 @@ def main():
     util.setup_seed()
 
     #Loading config
-    with open(r'utils/args.yaml') as cf_file:
+    with open(args.args_file) as cf_file:
         params = yaml.safe_load( cf_file.read())
 
 
@@ -55,7 +56,7 @@ def train(args, params):
     starting_epoch = 0
     if check_checkpoint(checkpoint_path):
         model, optimizer, scheduler, starting_epoch = load_latest_checkpoint(checkpoint_path)
-        print(f"Checkpoint found, starting from epoch {epoch}")
+        print(f"Checkpoint found, starting from epoch {starting_epoch}")
     else:
         print("No checkpoint found, starting new training")
         starting_epoch = 0
@@ -72,7 +73,7 @@ def train(args, params):
             filename = filename.rstrip().split('/')[-1]
             filenames.append(params.get('train_imgs') + filename)
 
-    train_dataset = Dataset(filenames, args.input_size, params, augment=False)
+    train_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
 
 
     if args.world_size <= 1:
@@ -81,8 +82,8 @@ def train(args, params):
         train_sampler = data.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=args.local_rank)
         train_loader.set_epoch(starting_epoch)
 
-    train_loader = data.DataLoader(train_dataset, args.batch_size, train_sampler,
-                             num_workers=8, pin_memory=True, collate_fn=Dataset.collate_fn)
+    train_loader = data.DataLoader(train_dataset, params.get('batch_size'), train_sampler,
+                             num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, shuffle=True)
 
 
     #Dataloading Validation
@@ -92,7 +93,7 @@ def train(args, params):
             filename = filename.rstrip().split('/')[-1]
             filenames.append(params.get('val_imgs') + filename)
     
-    validation_dataset = Dataset(filenames, args.input_size, params, augment=False)
+    validation_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
 
 
     if args.world_size <= 1:
@@ -101,8 +102,8 @@ def train(args, params):
         validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank)
         validation_sampler.set_epoch(starting_epoch)
 
-    validation_loader = data.DataLoader(validation_dataset, args.batch_size, validation_sampler,
-                             num_workers=8, pin_memory=True, collate_fn=Dataset.collate_fn)
+    validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), validation_sampler,
+                             num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, shuffle=True)
 
     
 
@@ -122,12 +123,18 @@ def train(args, params):
     #num_val_batch = len(validation_loader)
     
     # Init Wandb
-    wandb.init(
-        project="Thermal",
-        config=params
-    )
+    if args.local_rank == 0:
+        wandb.init(
+            project="Thermal",
+            config=params
+        )
     
-    for epoch in range(starting_epoch, args.epochs):
+    if args.local_rank == 0:
+        wandb.log({
+            'Args File': args.args_file
+        })
+    
+    for epoch in range(starting_epoch, params.get('epochs')):
 
         m_loss = util.AverageMeter()
 
@@ -163,9 +170,10 @@ def train(args, params):
 
             loss.backward()
             
-            wandb.log(
-                {"Training loss": m_loss.avg}
-            )
+            if args.local_rank == 0:
+                wandb.log(
+                    {"Training loss": m_loss.avg}
+                )
             
             del loss
 
@@ -204,15 +212,21 @@ def train(args, params):
         avg_vloss = running_vloss / (len(p_bar) + 1)
 
         #print(f"Validation loss for epoch {epoch} is: {avg_vloss}")
-        wandb.log({
-            'Validation Loss': avg_vloss
-        })
+        if args.local_rank == 0:
+            wandb.log({
+                'Validation Loss': avg_vloss
+            })
         
         del avg_vloss
         del running_vloss
         
         # Step learning rate scheduler
         scheduler.step()
+        
+        if args.local_rank == 0:
+            wandb.log({
+                'Epoch': epoch
+            })
         
         # Saving checkpoint
         save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path)
