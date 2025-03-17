@@ -114,6 +114,7 @@ def train(args, params):
             model = torch.nn.parallel.DistributedDataParallel(module=model,
                                                             device_ids=[args.local_rank],
                                                             output_device=args.local_rank)
+
     criterion = util.ComputeLoss(model, params)
 
     num_batch = len(train_loader)
