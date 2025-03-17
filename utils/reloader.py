@@ -6,11 +6,11 @@ from tqdm import tqdm
 
 # ----- CONFIGURATION -----
 # Path to your JSON file (e.g., for validation split)
-json_path = '/ceph/project/DAKI4-thermal-2025/harborfrontv2/Train.json'
+json_path = "/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfrontv2/Valid.json"
 # Base directory where images are stored (relative to your current directory)
-base_img_dir = '/ceph/project/DAKI4-thermal-2025/harborfrontv2/frames'
+base_img_dir = "/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfrontv2/frames"
 # Specify the dataset split ("train", "valid", or "test")
-dataset_split = "train"  # Change as needed
+dataset_split = "valid"  # Change as needed
 
 # Define the output directory where both images and labels will be saved
 images_dir = os.path.join('Data', 'Images', dataset_split)

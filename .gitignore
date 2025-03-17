@@ -1,3 +1,10 @@
+wandb/
+secrets/
+Data/Images
+Data/images
+Data/labels
+Data/Labels
+runs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
