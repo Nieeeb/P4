@@ -86,7 +86,7 @@ def train(args, params):
         train_sampler = data.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=args.local_rank)
         train_loader.set_epoch(starting_epoch)
 
-    train_loader = data.DataLoader(train_dataset, params.get('batch_size'), train_sampler,
+    train_loader = data.DataLoader(train_dataset, params.get('batch_size'), sampler=train_sampler,
                              num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, shuffle=True)
 
 
@@ -106,7 +106,7 @@ def train(args, params):
         validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank)
         validation_sampler.set_epoch(starting_epoch)
 
-    validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), validation_sampler,
+    validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
                              num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, shuffle=True)
 
     
@@ -168,7 +168,7 @@ def train(args, params):
             m_loss.update(loss.item(), samples.size(0))
 
 
-            loss *= args.batch_size  # loss scaled by batch_size
+            loss *= params.get('batch_size')  # loss scaled by batch_size
             loss *= args.world_size  # gradient averaged between devices in DDP mode
 
             loss.backward()
