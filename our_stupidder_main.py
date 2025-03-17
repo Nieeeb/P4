@@ -129,7 +129,8 @@ def train(args, params):
     if args.local_rank == 0:
         wandb.init(
             project="Thermal",
-            config=params
+            config=params,
+            name=params.get('checkpoint_path')
         )
     
     if args.local_rank == 0:
