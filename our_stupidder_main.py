@@ -40,8 +40,12 @@ def main():
     #Loading config
     with open(args.args_file) as cf_file:
         params = yaml.safe_load( cf_file.read())
-
-
+        
+    mp.spawn(train(args,params), nprocs=args.world_size, join=True)
+    
+    if args.world_size > 1:
+        "Cleans up the distributed environment"
+        torch.distributed.destroy_process_group()
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -115,7 +119,6 @@ def train(args, params):
             model = torch.nn.parallel.DistributedDataParallel(module=model,
                                                             device_ids=[args.local_rank],
                                                             output_device=args.local_rank)
-
     criterion = util.ComputeLoss(model, params)
 
     num_batch = len(train_loader)
