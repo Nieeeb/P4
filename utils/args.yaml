@@ -25,6 +25,9 @@ train_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/"
 train_txt: "Data/train.txt"
 val_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/valid/"
 val_txt: "Data/val.txt"
+epochs: 100                 # Number of epochs to train
+batch_size: 96              # Batch size for data loading
+input_size: 384             # Input size of images
 # classes
 names:
   0: person
