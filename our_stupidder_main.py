@@ -71,6 +71,7 @@ def train(args, params):
 
     
     #Dataloading train 
+    print("Loading train.cahce")
     filenames = []
     with open(params.get('train_txt')) as reader:
         for filename in reader.readlines():
@@ -80,6 +81,8 @@ def train(args, params):
     train_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
 
 
+
+    print("Initializing training_loader")
     if args.world_size <= 1:
         train_sampler = None
     else:
@@ -90,6 +93,7 @@ def train(args, params):
                              num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
 
 
+    print("Validation data loading")
     #Dataloading Validation
     filenames = []
     with open(params.get('val_txt')) as reader:
@@ -112,7 +116,7 @@ def train(args, params):
     
 
 
-
+    print("Setting DDP mode")
     if args.world_size > 1:
             # DDP mode
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -139,7 +143,7 @@ def train(args, params):
         })
     
     for epoch in range(starting_epoch, params.get('epochs')):
-
+        print(f"training epoch: {epoch}")
         m_loss = util.AverageMeter()
 
         if args.world_size > 1:
