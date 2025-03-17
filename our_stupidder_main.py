@@ -38,7 +38,6 @@ def main():
 
 
 
-
 def train(args, params):
 
     #Loading model
