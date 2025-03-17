@@ -148,12 +148,15 @@ def train(rank, args, params):
         m_loss = util.AverageMeter()
 
         if args.world_size > 1:
+            print("Setting train_sampler to epoch")
+
             train_sampler.set_epoch(epoch)
             
         p_bar = enumerate(train_loader)
         if args.local_rank == 0:
             print(('\n' + '%10s' * 3) % ('epoch', 'memory', '    train_loss'))
-        if args.local_rank == 0:
+        if args.local_rank == 0:    
+            print("Setting progress bar")
             p_bar = tqdm.tqdm(p_bar, total=num_batch)  # progress bar
 
         for _, (samples, targets, _) in p_bar:
@@ -178,6 +181,8 @@ def train(rank, args, params):
             loss *= args.world_size  # gradient averaged between devices in DDP mode
 
             loss.backward()
+
+            print(m_loss.avg)
             
             if args.local_rank == 0:
                 wandb.log(
