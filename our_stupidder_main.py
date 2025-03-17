@@ -23,6 +23,7 @@ def main():
     #parser.add_argument('--epochs', default=100, type=int)
     #parser.add_argument('--train', action='store_true')
     #parser.add_argument('--test', action='store_true')
+    parser.add_argument('--args_file', default='utils/args.yaml', type=str)
 
     args = parser.parse_args()
 
@@ -37,7 +38,7 @@ def main():
     util.setup_seed()
 
     #Loading config
-    with open(r'utils/args.yaml') as cf_file:
+    with open(args.args_file) as cf_file:
         params = yaml.safe_load( cf_file.read())
         
     mp.spawn(train(args,params), nprocs=args.world_size, join=True)
