@@ -28,7 +28,7 @@ val_txt: "Data/val.txt"
 epochs: 100                 # Number of epochs to train
 batch_size: 96              # Batch size for data loading
 input_size: 384             # Input size of images
-args_file: "utils/args.yaml"
+
 # classes
 names:
   0: person

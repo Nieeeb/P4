@@ -126,10 +126,16 @@ def train(args, params):
     #num_val_batch = len(validation_loader)
     
     # Init Wandb
-    wandb.init(
-        project="Thermal",
-        config=params
-    )
+    if args.local_rank == 0:
+        wandb.init(
+            project="Thermal",
+            config=params
+        )
+    
+    if args.local_rank == 0:
+        wandb.log({
+            'Args File': args.args_file
+        })
     
     for epoch in range(starting_epoch, params.get('epochs')):
 
@@ -167,9 +173,10 @@ def train(args, params):
 
             loss.backward()
             
-            wandb.log(
-                {"Training loss": m_loss.avg}
-            )
+            if args.local_rank == 0:
+                wandb.log(
+                    {"Training loss": m_loss.avg}
+                )
             
             del loss
 
@@ -208,9 +215,10 @@ def train(args, params):
         avg_vloss = running_vloss / (len(p_bar) + 1)
 
         #print(f"Validation loss for epoch {epoch} is: {avg_vloss}")
-        wandb.log({
-            'Validation Loss': avg_vloss
-        })
+        if args.local_rank == 0:
+            wandb.log({
+                'Validation Loss': avg_vloss
+            })
         
         del avg_vloss
         del running_vloss
@@ -218,9 +226,10 @@ def train(args, params):
         # Step learning rate scheduler
         scheduler.step()
         
-        wandb.log({
-            'Epoch': epoch
-        })
+        if args.local_rank == 0:
+            wandb.log({
+                'Epoch': epoch
+            })
         
         # Saving checkpoint
         save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path)
