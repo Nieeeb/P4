@@ -117,7 +117,7 @@ def train(args, params):
             # DDP mode
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
             model = torch.nn.parallel.DistributedDataParallel(module=model,
-                                                            device_ids=[args.local_rank],
+                                                            device_ids=[args.local_rank]
                                                             ) #output_device=args.local_rank
     criterion = util.ComputeLoss(model, params)
 
