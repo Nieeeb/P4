@@ -242,9 +242,9 @@ def train(rank, args, params):
         if args.world_size > 1:
             cleanup()
             
-    except:
+    except Exception as e:
         cleanup()
-        print("Unexpected error:", sys.exc_info()[0])
+        print(e)
         exit
 
 
