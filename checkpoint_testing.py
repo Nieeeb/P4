@@ -1,8 +1,7 @@
 from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
-from nets.nn import yolo_v8_n
+from nets.nn import yolo_v8_m
 import torch
 import os
-
 
 
 def main():
@@ -17,7 +16,7 @@ def main():
         model, optimizer, scheduler, starting_epoch = load_latest_checkpoint(run_path)
     else:
         starting_epoch = -1
-        model = yolo_v8_n(num_classes=4).cuda()
+        model = yolo_v8_m(num_classes=4).cuda()
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(module=model, device_ids=[1])
         optimizer = torch.optim.Adam(model.parameters(), lr=0.002)
@@ -26,7 +25,7 @@ def main():
     for epoch in range(starting_epoch, 11):
         # Fake training
         print(epoch)
-        save_checkpoint(model, optimizer, scheduler, epoch, run_path)
+        save_checkpoint(model, optimizer, scheduler, epoch, run_path, 'm')
     
     torch.distributed.destroy_process_group()
         

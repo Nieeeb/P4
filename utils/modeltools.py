@@ -2,15 +2,17 @@ import torch
 from pathlib import Path
 import os
 from typing import Tuple
+from nets.nn import yolo_v8_m
 
 # Method for saving trainign state to a given path
 # Path should be a folder
-def save_checkpoint(model: torch.nn.Module, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.LRScheduler, epoch: int, path: str):
+def save_checkpoint(model: torch.nn.Module, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.LRScheduler, epoch: int, path: str, yolo_size: str):
     state_dict ={
-        'model': model,
+        'model': model.state_dict(),
         'optimizer': optimizer,
         'scheduler': scheduler,
-        'epoch': epoch
+        'epoch': epoch,
+        'yolo_size': yolo_size
     }
     if not Path(path).exists():
         parent = os.path.dirname(path)
@@ -31,7 +33,11 @@ def load_latest_checkpoint(path: str): #-> Tuple[torch.nn.Module | torch.nn.para
     state_path = os.path.join(path, 'latest')
     state_dict = torch.load(state_path, weights_only=False)
     
-    model = state_dict['model']
+    if state_dict['yolo_size'] == 'm':
+        model = yolo_v8_m(num_classes=4).cuda()
+        model = torch.nn.parallel.DistributedDataParallel(model)
+        model.load_state_dict(state_dict=state_dict['model'])
+
     optimizer = state_dict['optimizer']
     scheduler = state_dict['scheduler']
     epoch = state_dict['epoch']
