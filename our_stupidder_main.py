@@ -24,6 +24,7 @@ def main():
     #parser.add_argument('--train', action='store_true')
     #parser.add_argument('--test', action='store_true')
     parser.add_argument('--args_file', default='utils/args.yaml', type=str)
+    parser.add_argument('--world_size', default=1, type=int)
 
     args = parser.parse_args()
 
