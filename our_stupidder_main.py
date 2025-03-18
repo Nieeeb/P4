@@ -33,7 +33,7 @@ def main():
     print(f"Local rank: {args.local_rank}")
     #Vi kan prøve det sådan her og hvis AI-LAB ikke har world_size system variabel kan vi bare sætte default til 8
     #args.world_size = int(os.getenv('WORLD_SIZE', 1))
-    args.world_size = torch.cuda.device_count()
+    #args.world_size = torch.cuda.device_count()
     print(f"World size: {args.world_size}")
 
     util.setup_seed()
