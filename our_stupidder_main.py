@@ -11,6 +11,7 @@ import tqdm
 import wandb
 from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
 import torch.multiprocessing as mp
+import sys
 
 warnings.filterwarnings("ignore")
 
@@ -241,9 +242,9 @@ def train(rank, args, params):
         if args.world_size > 1:
             cleanup()
             
-    except Exception as e:
+    except:
         cleanup()
-        print(e)
+        print("Unexpected error:", sys.exc_info()[0])
         exit
 
 
