@@ -43,9 +43,6 @@ def main():
         params = yaml.safe_load( cf_file.read())
         
     mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
-    
-    if args.world_size > 1:
-        cleanup()
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -240,6 +237,10 @@ def train(rank, args, params):
             # Saving checkpoint
             if args.local_rank == 0:
                 save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path)
+                
+        if args.world_size > 1:
+            cleanup()
+            
     except Exception as e:
         cleanup()
         print(e)
