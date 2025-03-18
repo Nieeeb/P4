@@ -178,17 +178,16 @@ def train(rank, args, params):
                 )
             
             del loss
-
-
+            
             optimizer.step()
-
 
             # Log
             if args.local_rank == 0:
                 memory = f'{torch.cuda.memory_reserved() / 1E9:.3g}G'  # (GB)
                 s = ('%10s' * 2 + '%10.4g') % (f'{epoch + 1}/{params.get("epochs")}', memory, m_loss.avg)
                 p_bar.set_description(s)
-            
+                
+        
     
         #Validation
         #model.eval()
@@ -227,8 +226,11 @@ def train(rank, args, params):
         
         if args.local_rank == 0:
             wandb.log({
-                'Epoch': epoch
+                'Epoch': epoch,
+                'Training Epoch Loss': m_loss.avg
             })
+            
+        del m_loss
         
         # Saving checkpoint
         if args.local_rank == 0:
