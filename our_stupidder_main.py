@@ -130,7 +130,8 @@ def train(rank, args, params):
             project="Thermal",
             config=params,
             resume="allow",
-            id=params.get('checkpoint_path')
+            group=params.get('run_name'),
+            id=params.get('run_name')
         )
     
     if args.local_rank == 0:
