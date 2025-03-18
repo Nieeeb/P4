@@ -26,7 +26,7 @@ def save_checkpoint(model: torch.nn.Module, optimizer: torch.optim.Optimizer, sc
 
 # Method for loading the latest checkpoint from a folder
 # Path should be a folder containing state dicts
-def load_latest_checkpoint(path: str) -> Tuple[torch.nn.Module | torch.nn.parallel.DistributedDataParallel, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler, int]:
+def load_latest_checkpoint(path: str): #-> Tuple[torch.nn.Module | torch.nn.parallel.DistributedDataParallel, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler, int]:
     assert Path(path).exists()
     state_path = os.path.join(path, 'latest')
     state_dict = torch.load(state_path, weights_only=False)
