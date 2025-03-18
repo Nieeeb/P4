@@ -89,7 +89,7 @@ def train(rank, args, params):
         train_sampler.set_epoch(starting_epoch)
 
     train_loader = data.DataLoader(train_dataset, params.get('batch_size'), sampler=train_sampler,
-                             num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
+                             num_workers=32, pin_memory=True, collate_fn=Dataset.collate_fn)
 
 
  
@@ -110,7 +110,7 @@ def train(rank, args, params):
         validation_sampler.set_epoch(starting_epoch)
 
     validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
-                             num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
+                             num_workers=32, pin_memory=True, collate_fn=Dataset.collate_fn)
 
     
     if args.world_size > 1:
