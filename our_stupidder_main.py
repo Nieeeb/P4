@@ -131,8 +131,7 @@ def train(rank, args, params):
             config=params,
             resume="allow",
             group=params.get('run_name'),
-            id=params.get('run_name'),
-            name=params.get('run_name')
+            id=params.get('run_name')
         )
     
     if args.local_rank == 0:
