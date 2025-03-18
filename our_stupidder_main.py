@@ -64,12 +64,17 @@ def train(rank, args, params):
         starting_epoch = 0
         if check_checkpoint(checkpoint_path):
             model, optimizer, scheduler, starting_epoch = load_latest_checkpoint(checkpoint_path)
+            model.to(args.local_rank)
             print(f"Checkpoint found, starting from epoch {starting_epoch}")
         else:
             print("No checkpoint found, starting new training")
             starting_epoch = 0
             model = yolo_v8_m(len(params.get('names')))
             model = model.to(args.local_rank)
+            if args.world_size > 1:
+                # DDP mode
+                model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+                model = torch.nn.parallel.DistributedDataParallel(module=model, device_ids=[args.local_rank])
             optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
 
@@ -115,12 +120,12 @@ def train(rank, args, params):
                                 num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
 
         
-        if args.world_size > 1:
-                # DDP mode
-                model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-                model = torch.nn.parallel.DistributedDataParallel(module=model,
-                                                                device_ids=[args.local_rank]
-                                                                ) #output_device=args.local_rank
+        #if args.world_size > 1:
+        #        # DDP mode
+        #        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        #        model = torch.nn.parallel.DistributedDataParallel(module=model,
+        #                                                        device_ids=[args.local_rank]
+        #                                                       ) #output_device=args.local_rank
         criterion = util.ComputeLoss(model, params)
 
         num_batch = len(train_loader)
@@ -240,8 +245,8 @@ def train(rank, args, params):
             if args.local_rank == 0:
                 save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path, yolo_size='m')
                 
-        if args.world_size > 1:
-            cleanup()
+        
+        cleanup()
             
     except Exception as e:
         cleanup()
