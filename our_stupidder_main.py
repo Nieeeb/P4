@@ -238,7 +238,7 @@ def train(rank, args, params):
             
             # Saving checkpoint
             if args.local_rank == 0:
-                save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path, model_size='m')
+                save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path, yolo_size='m')
                 
         if args.world_size > 1:
             cleanup()
