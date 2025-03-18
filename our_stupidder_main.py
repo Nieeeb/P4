@@ -190,12 +190,14 @@ def train(rank, args, params):
         
     
         #Validation
+        if args.local_rank == 0:
+            print(f"Beginning epoch validation for epoch {epoch}")
         #model.eval()
         #p_bar = enumerate(validation_loader)
 
         #if args.local_rank == 0:
         #        p_bar = tqdm.tqdm(p_bar, total=num_val_batch)  # progress bar
-
+        
         running_vloss = 0.0
 
         with torch.no_grad():
