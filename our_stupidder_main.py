@@ -125,7 +125,6 @@ def train(rank, args, params):
     
     # Init Wandb
     if args.local_rank == 0:
-        wandb.login(key="a8097168c7471af73c242409ca5f06ac7f2ad864")
         wandb.init(
             project="Thermal",
             config=params,
