@@ -72,7 +72,6 @@ def train(rank, args, params):
 
     
     #Dataloading train 
-    print("Loading train.cahce")
     filenames = []
     with open(params.get('train_txt')) as reader:
         for filename in reader.readlines():
@@ -82,8 +81,6 @@ def train(rank, args, params):
     train_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
 
 
-
-    print("Initializing training_loader")
     if args.world_size <= 1:
         train_sampler = None
     else:
@@ -94,7 +91,7 @@ def train(rank, args, params):
                              num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
 
 
-    print("Validation data loading")
+ 
     #Dataloading Validation
     filenames = []
     with open(params.get('val_txt')) as reader:
@@ -115,9 +112,6 @@ def train(rank, args, params):
                              num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
 
     
-
-
-    print("Setting DDP mode")
     if args.world_size > 1:
             # DDP mode
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -128,7 +122,6 @@ def train(rank, args, params):
 
     num_batch = len(train_loader)
 
-    #num_val_batch = len(validation_loader)
     
     # Init Wandb
     if args.local_rank == 0:
@@ -145,19 +138,15 @@ def train(rank, args, params):
         })
     
     for epoch in range(starting_epoch, params.get('epochs')):
-        print(f"training epoch: {epoch}")
         m_loss = util.AverageMeter()
 
         if args.world_size > 1:
-            print("Setting train_sampler to epoch")
-
             train_sampler.set_epoch(epoch)
             
         p_bar = enumerate(train_loader)
         if args.local_rank == 0:
             print(('\n' + '%10s' * 3) % ('epoch', 'memory', '    train_loss'))
         if args.local_rank == 0:    
-            print("Setting progress bar")
             p_bar = tqdm.tqdm(p_bar, total=num_batch)  # progress bar
 
         for _, (samples, targets, _) in p_bar:
@@ -170,8 +159,6 @@ def train(rank, args, params):
             samples = samples.float() / 255
             #targets = targets.cuda()
 
-            #print(f"Train shape: {samples.shape} and {targets.shape}")
-
             outputs = model(samples)  # forward
             loss = criterion(outputs, targets)
 
@@ -182,8 +169,6 @@ def train(rank, args, params):
             loss *= args.world_size  # gradient averaged between devices in DDP mode
 
             loss.backward()
-
-            print(m_loss.avg)
             
             if args.local_rank == 0:
                 wandb.log(
