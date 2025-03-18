@@ -210,7 +210,7 @@ def train(rank, args, params):
                 vloss = criterion(outputs, targets)
                 running_vloss += vloss
 
-        avg_vloss = running_vloss / (len(p_bar) + 1)
+        avg_vloss = running_vloss / (len(validation_loader.dataset) + 1)
 
         #print(f"Validation loss for epoch {epoch} is: {avg_vloss}")
         if args.local_rank == 0:
