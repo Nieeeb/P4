@@ -14,7 +14,7 @@ def save_checkpoint(model: torch.nn.Module, optimizer: torch.optim.Optimizer, sc
     }
     if not Path(path).exists():
         parent = os.path.dirname(path)
-        if not Path(parent).exists:
+        if not Path(parent).exists():
             os.mkdir(parent)
         os.mkdir(path)
     
