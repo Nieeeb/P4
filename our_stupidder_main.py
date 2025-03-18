@@ -128,7 +128,8 @@ def train(rank, args, params):
         wandb.init(
             project="Thermal",
             config=params,
-            name=params.get('checkpoint_path')
+            resume="allow",
+            id=params.get('checkpoint_path')
         )
     
     if args.local_rank == 0:
