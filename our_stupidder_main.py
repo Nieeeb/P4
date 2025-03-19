@@ -65,7 +65,7 @@ def train(rank, args, params):
         if check_checkpoint(checkpoint_path):
             model, optimizer, scheduler, starting_epoch = load_latest_checkpoint(checkpoint_path)
             model.to(args.local_rank)
-            print(f"Checkpoint found, starting from epoch {starting_epoch}")
+            print(f"Checkpoint found, starting from epoch {starting_epoch + 1}")
         else:
             print("No checkpoint found, starting new training")
             starting_epoch = 0
@@ -78,6 +78,9 @@ def train(rank, args, params):
             optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
 
+        if starting_epoch + 1 >= params.get('epochs'):
+            print(f"Already trained for {params.get('epochs')} epochs. Exiting")
+            exit
         
         #Dataloading train 
         filenames = []
@@ -235,7 +238,7 @@ def train(rank, args, params):
             
             if args.local_rank == 0:
                 wandb.log({
-                    'Epoch': epoch,
+                    'Epoch': epoch + 1,
                     'Training Epoch Loss': m_loss.avg
                 })
                 
