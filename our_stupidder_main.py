@@ -244,7 +244,7 @@ def train(rank, args, params):
             
             # Saving checkpoint
             if args.local_rank == 0:
-                save_checkpoint(model, optimizer, scheduler, epoch, checkpoint_path, yolo_size='m')
+                save_checkpoint(model, optimizer, scheduler, epoch + 1, checkpoint_path, yolo_size='m')
                 
         
         cleanup()
