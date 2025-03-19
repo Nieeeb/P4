@@ -149,6 +149,7 @@ def train(rank, args, params):
                 'Args File': args.args_file
             })
         
+        torch.distributed.barrier()
         for epoch in range(starting_epoch, params.get('epochs')):
             m_loss = util.AverageMeter()
 
@@ -200,15 +201,15 @@ def train(rank, args, params):
             
         
             #Validation
-            if args.local_rank == 0:
-                print(f"Beginning epoch validation for epoch {epoch + 1}")
+            #if args.local_rank == 0:
+            #    print(f"Beginning epoch validation for epoch {epoch + 1}")
             #model.eval()
             #p_bar = enumerate(validation_loader)
 
             #if args.local_rank == 0:
             #        p_bar = tqdm.tqdm(p_bar, total=num_val_batch)  # progress bar
             
-            running_vloss = 0.0
+            """ running_vloss = 0.0
 
             with torch.no_grad():
                 for _, (samples, targets, _) in enumerate(validation_loader):
@@ -223,24 +224,20 @@ def train(rank, args, params):
                     running_vloss += vloss.item()
                     del outputs
                     del vloss
-
-            torch.distributed.barrier()
-            torch.distributed.all_reduce(running_vloss, torch.distributed.ReduceOp.SUM, async_op=False)
-            avg_vloss = running_vloss / (len(validation_loader.dataset))
-            
+            """
             if args.local_rank == 0:
                 wandb.log({
                     'Epoch': epoch + 1,
-                    'Training Epoch Loss': m_loss.avg,
-                    'Validation Loss': avg_vloss
+                    'Training Epoch Loss': m_loss.avg # 'Validation Loss': avg_vloss
                 })
+                
+            del m_loss
+            #del avg_vloss
+            #del running_vloss
+            
             
             # Step learning rate scheduler
             scheduler.step()
-                
-            del m_loss
-            del avg_vloss
-            del running_vloss
             
             # Saving checkpoint
             if args.local_rank == 0:
