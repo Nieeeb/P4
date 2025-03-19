@@ -207,11 +207,16 @@ def train(rank, args, params):
                 print(f"Beginning epoch validation for epoch {epoch + 1}")
             
             if args.local_rank == 0:
+                
+                num_val_batch = len(validation_loader)
+                v_bar = enumerate(train_loader)
+                print(('\n' + '%10s' * 3) % ('epoch', 'memory', '    val_loss')) 
+                v_bar = tqdm.tqdm(v_bar, total=num_val_batch)  # progress bar
             
-                running_vloss = 0.0
+                v_loss = util.AverageMeter()
 
                 with torch.no_grad():
-                    for _, (samples, targets, _) in enumerate(validation_loader):
+                    for _, (samples, targets, _) in v_bar:
                         samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
                         
                         samples = samples.float() / 255
@@ -220,21 +225,23 @@ def train(rank, args, params):
                         
                         outputs = model(samples)
                         vloss = criterion(outputs, targets)
-                        running_vloss += vloss.item()
+                        v_loss.update(vloss.item(), samples.size(0))
+                        
+                        memory = f'{torch.cuda.memory_reserved() / 1E9:.3g}G'  # (GB)
+                        s = ('%10s' * 2 + '%10.4g') % (f'{epoch + 1}/{params.get("epochs")}', memory, v_loss.avg)
+                        v_bar.set_description(s)
+                        
                         del outputs
                         del vloss
-                
-                avg_vloss = running_vloss / len(validation_loader.dataset)
                 
                 if args.local_rank == 0:
                     wandb.log({
                         'Epoch': epoch + 1,
                         'Training Epoch Loss': m_loss.avg,
-                        'Validation Loss': avg_vloss
+                        'Validation Loss': v_loss.avg
                     })
                     
-                del avg_vloss
-                del running_vloss
+                del v_loss
                 
             del m_loss           
             
