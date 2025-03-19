@@ -119,9 +119,10 @@ def train(rank, args, params):
             validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True, drop_last=False)
             validation_sampler.set_epoch(starting_epoch)
 
-        validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
+        #validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
+        #                        num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+        validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=None,
                                 num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
-
         
         #if args.world_size > 1:
         #        # DDP mode
@@ -184,9 +185,10 @@ def train(rank, args, params):
                 loss.backward()
                 
                 if args.local_rank == 0:
-                    wandb.log(
-                        {"Training loss": m_loss.avg}
-                    )
+                    wandb.log({
+                        "Training mloss average": m_loss.avg,
+                        "Raw loss": loss
+                    })
                 
                 del loss
                 
@@ -201,41 +203,42 @@ def train(rank, args, params):
             
         
             #Validation
-            #if args.local_rank == 0:
-            #    print(f"Beginning epoch validation for epoch {epoch + 1}")
-            #model.eval()
-            #p_bar = enumerate(validation_loader)
-
-            #if args.local_rank == 0:
-            #        p_bar = tqdm.tqdm(p_bar, total=num_val_batch)  # progress bar
-            
-            """ running_vloss = 0.0
-
-            with torch.no_grad():
-                for _, (samples, targets, _) in enumerate(validation_loader):
-                    samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
-                    
-                    samples = samples.float() / 255
-
-                    #print(f"Val shape: {samples.shape} and {targets.shape}")
-                    
-                    outputs = model(samples)
-                    vloss = criterion(outputs, targets)
-                    running_vloss += vloss.item()
-                    del outputs
-                    del vloss
-            """
             if args.local_rank == 0:
-                wandb.log({
-                    'Epoch': epoch + 1,
-                    'Training Epoch Loss': m_loss.avg # 'Validation Loss': avg_vloss
-                })
+                print(f"Beginning epoch validation for epoch {epoch + 1}")
+            
+            if args.local_rank == 0:
+            
+                running_vloss = 0.0
+
+                with torch.no_grad():
+                    for _, (samples, targets, _) in enumerate(validation_loader):
+                        samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
+                        
+                        samples = samples.float() / 255
+
+                        #print(f"Val shape: {samples.shape} and {targets.shape}")
+                        
+                        outputs = model(samples)
+                        vloss = criterion(outputs, targets)
+                        running_vloss += vloss.item()
+                        del outputs
+                        del vloss
                 
-            del m_loss
-            #del avg_vloss
-            #del running_vloss
+                avg_vloss = running_vloss / len(validation_loader.dataset)
+                
+                if args.local_rank == 0:
+                    wandb.log({
+                        'Epoch': epoch + 1,
+                        'Training Epoch Loss': m_loss.avg,
+                        'Validation Loss': avg_vloss
+                    })
+                    
+                del avg_vloss
+                del running_vloss
+                
+            del m_loss           
             
-            
+            torch.distributed.barrier()
             # Step learning rate scheduler
             scheduler.step()
             
