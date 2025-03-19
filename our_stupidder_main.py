@@ -157,6 +157,7 @@ def train(rank, args, params):
 
             if args.world_size > 1:
                 train_sampler.set_epoch(epoch)
+                validation_sampler.set_epoch(epoch)
                 
             p_bar = enumerate(train_loader)
             if args.local_rank == 0:
