@@ -102,27 +102,27 @@ def train(rank, args, params):
                                 num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
 
 
-    
-        #Dataloading Validation
-        filenames = []
-        with open(params.get('val_txt')) as reader:
-            for filename in reader.readlines():
-                filename = filename.rstrip().split('/')[-1]
-                filenames.append(params.get('val_imgs') + filename)
-        
-        validation_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
+        if args.local_rank == 0:
+            #Dataloading Validation
+            filenames = []
+            with open(params.get('val_txt')) as reader:
+                for filename in reader.readlines():
+                    filename = filename.rstrip().split('/')[-1]
+                    filenames.append(params.get('val_imgs') + filename)
+            
+            validation_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
 
 
-        if args.world_size <= 1:
-            validation_sampler = None
-        else:
-            validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True, drop_last=False)
-            validation_sampler.set_epoch(starting_epoch)
+            if args.world_size <= 1:
+                validation_sampler = None
+            else:
+                validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True, drop_last=False)
+                validation_sampler.set_epoch(starting_epoch)
 
-        #validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
-        #                        num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
-        validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=None,
-                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+            #validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
+            #                        num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+            validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=None,
+                                    num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
         
         #if args.world_size > 1:
         #        # DDP mode
