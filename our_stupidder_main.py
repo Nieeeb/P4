@@ -206,16 +206,11 @@ def train(rank, args, params):
             #Validation
             if args.local_rank == 0:
                 print(f"Beginning epoch validation for epoch {epoch + 1}")
-                
-                num_val_batch = len(validation_loader)
-                v_bar = enumerate(train_loader)
-                print(('\n' + '%10s' * 3) % ('epoch', 'memory', '    val_loss')) 
-                v_bar = tqdm.tqdm(v_bar, total=num_val_batch)  # progress bar
             
                 v_loss = util.AverageMeter()
 
                 with torch.no_grad():
-                    for _, (samples, targets, _) in v_bar:
+                    for _, (samples, targets, _) in enumerate(validation_loader):
                         samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
                         
                         samples = samples.float() / 255
@@ -226,14 +221,10 @@ def train(rank, args, params):
                         vloss = criterion(outputs, targets)
                         v_loss.update(vloss.item(), samples.size(0))
                         
-                        memory = f'{torch.cuda.memory_reserved() / 1E9:.3g}G'  # (GB)
-                        s = ('%10s' * 2 + '%10.4g') % (f'{epoch + 1}/{params.get("epochs")}', memory, v_loss.avg)
-                        v_bar.set_description(s)
-                        
                         del outputs
-                    
-                print(f"Validation complete. Loss is at: {v_loss.avg}")
-                del vloss
+                        del vloss
+                
+                print(f"Validation complete. Val Loss is at: {v_loss.avg}")
                 
                 if args.local_rank == 0:
                     wandb.log({
