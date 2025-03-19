@@ -95,11 +95,11 @@ def train(rank, args, params):
         if args.world_size <= 1:
             train_sampler = None
         else:
-            train_sampler = data.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True)
+            train_sampler = data.DistributedSampler(train_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True, drop_last=False)
             train_sampler.set_epoch(starting_epoch)
 
         train_loader = data.DataLoader(train_dataset, params.get('batch_size'), sampler=train_sampler,
-                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
+                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
 
 
     
@@ -116,11 +116,11 @@ def train(rank, args, params):
         if args.world_size <= 1:
             validation_sampler = None
         else:
-            validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True)
+            validation_sampler = data.DistributedSampler(validation_dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True, drop_last=False)
             validation_sampler.set_epoch(starting_epoch)
 
         validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
-                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn)
+                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
 
         
         #if args.world_size > 1:
@@ -212,37 +212,35 @@ def train(rank, args, params):
 
             with torch.no_grad():
                 for _, (samples, targets, _) in enumerate(validation_loader):
+                    samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
                     
-                    samples = samples.cuda().float() / 255
-                    targets = targets.cuda()
+                    samples = samples.float() / 255
 
                     #print(f"Val shape: {samples.shape} and {targets.shape}")
                     
                     outputs = model(samples)
                     vloss = criterion(outputs, targets)
-                    running_vloss += vloss
+                    running_vloss += vloss.item()
+                    del outputs
+                    del vloss
 
-            avg_vloss = running_vloss / (len(validation_loader.dataset) + 1)
-
-            #print(f"Validation loss for epoch {epoch} is: {avg_vloss}")
-            if args.local_rank == 0:
-                wandb.log({
-                    'Validation Loss': avg_vloss
-                })
-            
-            del avg_vloss
-            del running_vloss
-            
-            # Step learning rate scheduler
-            scheduler.step()
+            torch.distributed.barrier()
+            torch.distributed.all_reduce(running_vloss, torch.distributed.ReduceOp.SUM, async_op=False)
+            avg_vloss = running_vloss / (len(validation_loader.dataset))
             
             if args.local_rank == 0:
                 wandb.log({
                     'Epoch': epoch + 1,
-                    'Training Epoch Loss': m_loss.avg
+                    'Training Epoch Loss': m_loss.avg,
+                    'Validation Loss': avg_vloss
                 })
+            
+            # Step learning rate scheduler
+            scheduler.step()
                 
             del m_loss
+            del avg_vloss
+            del running_vloss
             
             # Saving checkpoint
             if args.local_rank == 0:
