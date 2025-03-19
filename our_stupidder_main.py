@@ -100,7 +100,7 @@ def train(rank, args, params):
             train_sampler.set_epoch(starting_epoch)
 
         train_loader = data.DataLoader(train_dataset, params.get('batch_size'), sampler=train_sampler,
-                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+                                num_workers=32, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
 
 
         if args.local_rank == 0:
@@ -123,7 +123,7 @@ def train(rank, args, params):
             #validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=validation_sampler,
             #                        num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
             validation_loader = data.DataLoader(validation_dataset, params.get('batch_size'), sampler=None,
-                                    num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+                                    num_workers=32, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
         
         #if args.world_size > 1:
         #        # DDP mode
