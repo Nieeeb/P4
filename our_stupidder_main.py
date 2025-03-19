@@ -206,8 +206,6 @@ def train(rank, args, params):
             #Validation
             if args.local_rank == 0:
                 print(f"Beginning epoch validation for epoch {epoch + 1}")
-            
-            if args.local_rank == 0:
                 
                 num_val_batch = len(validation_loader)
                 v_bar = enumerate(train_loader)
@@ -233,7 +231,9 @@ def train(rank, args, params):
                         v_bar.set_description(s)
                         
                         del outputs
-                        del vloss
+                    
+                print(f"Validation complete. Loss is at: {v_loss.avg}")
+                del vloss
                 
                 if args.local_rank == 0:
                     wandb.log({
