@@ -51,7 +51,7 @@ def setup(rank, world_size):
     os.environ['MASTER_PORT'] = '12355'
     #os.environ['CUDA_VISIBLE_DEVICES'] = os.getenv('LOCAL_RANK', 0)
     torch.cuda.set_device(rank)
-    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size, timeout=timedelta(hours=1))
 
 def cleanup():
     torch.distributed.destroy_process_group()    
@@ -246,7 +246,7 @@ def train(rank, args, params):
                 
             del m_loss           
             
-            torch.distributed.monitored_barrier(timeout=timedelta(hours=1))
+            torch.distributed.barrier()
             # Step learning rate scheduler
             scheduler.step()
             
