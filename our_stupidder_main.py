@@ -201,7 +201,7 @@ def train(rank, args, params):
         
             #Validation
             if args.local_rank == 0:
-                print(f"Beginning epoch validation for epoch {epoch}")
+                print(f"Beginning epoch validation for epoch {epoch + 1}")
             #model.eval()
             #p_bar = enumerate(validation_loader)
 
