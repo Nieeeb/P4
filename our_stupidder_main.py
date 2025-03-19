@@ -12,6 +12,7 @@ import wandb
 from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
 import torch.multiprocessing as mp
 import sys
+from datetime import timedelta
 
 warnings.filterwarnings("ignore")
 
@@ -245,7 +246,7 @@ def train(rank, args, params):
                 
             del m_loss           
             
-            torch.distributed.barrier()
+            torch.distributed.monitored_barrier(timeout=timedelta(hours=1))
             # Step learning rate scheduler
             scheduler.step()
             
