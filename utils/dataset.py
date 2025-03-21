@@ -38,19 +38,19 @@ class Dataset(data.Dataset):
         params = self.params
         # mosaic = self.mosaic and random.random() < params['mosaic']
 
-        # if mosaic:
-        #     shapes = None
-        #     # Load MOSAIC
-        #     image, label = self.load_mosaic(index, params)
-        #     # MixUp augmentation
-        #     if random.random() < params['mix_up']:
-        #         index = random.choice(self.indices)
-        #         mix_image1, mix_label1 = image, label
-        #         mix_image2, mix_label2 = self.load_mosaic(index, params)
+        if self.mosaic:
+            shapes = None
+            # Load MOSAIC
+            image, label = self.load_mosaic(index, params)
+            # MixUp augmentation
+            #if random.random() < params['mix_up']:
+            #    index = random.choice(self.indices)
+            #    mix_image1, mix_label1 = image, label
+            #    mix_image2, mix_label2 = self.load_mosaic(index, params)
 
         #         image, label = mix_up(mix_image1, mix_label1, mix_image2, mix_label2)
-        # else:
-        if True:
+        else:
+        #if True:
             # Load image
             image, shape = self.load_image(index)
             h, w = image.shape[:2]
@@ -127,7 +127,7 @@ class Dataset(data.Dataset):
 
     def load_mosaic(self, index, params):
         label4 = []
-        image4 = numpy.full((self.input_size * 2, self.input_size * 2, 3), 0, dtype=numpy.uint8)
+        image4 = numpy.full((self.input_size * 2, self.input_size * 2), 0, dtype=numpy.uint8)
         y1a, y2a, x1a, x2a, y1b, y2b, x1b, x2b = (None, None, None, None, None, None, None, None)
 
         border = [-self.input_size // 2, -self.input_size // 2]
@@ -141,8 +141,8 @@ class Dataset(data.Dataset):
         for i, index in enumerate(indices):
             # Load image
             image, _ = self.load_image(index)
-            #shape = image.shape
-            shape = image.size
+            shape = image.shape
+            #shape = image.size
             if i == 0:  # top left
                 x1a = max(xc - shape[1], 0)
                 y1a = max(yc - shape[0], 0)
@@ -181,6 +181,7 @@ class Dataset(data.Dataset):
                 y2b = min(y2a - y1a, shape[0])
 
             image4[y1a:y2a, x1a:x2a] = image[y1b:y2b, x1b:x2b]
+            
             pad_w = x1a - x1b
             pad_h = y1a - y1b
 
@@ -196,7 +197,7 @@ class Dataset(data.Dataset):
             numpy.clip(x, 0, 2 * self.input_size, out=x)
 
         # Augment
-        image4, label4 = random_perspective(image4, label4, params, border)
+        #image4, label4 = random_perspective(image4, label4, params, border)
 
         return image4, label4
 

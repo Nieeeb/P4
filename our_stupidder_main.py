@@ -90,7 +90,7 @@ def train(rank, args, params):
                 filename = filename.rstrip().split('/')[-1]
                 filenames.append(params.get('train_imgs') + filename)
 
-        train_dataset = Dataset(filenames, params.get('input_size'), params, augment=False)
+        train_dataset = Dataset(filenames, params.get('input_size'), params, augment=True)
 
 
         if args.world_size <= 1:

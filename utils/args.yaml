@@ -20,15 +20,15 @@ dfl: 1.5                      # cls loss gain
 #mosaic: 1.00000               # image mosaic (probability)
 #mix_up: 0.00000               # image mix-up (probability)
 online: False                 # If Data should be pulled from online datastore or is stored locally
-checkpoint_path: "runs/run0"  # Path to save model checkpoints
-train_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/train/"
+checkpoint_path: "runs/egg"  # Path to save model checkpoints
+train_imgs: "Data/images/train/"
 train_txt: "Data/train.txt"
-val_imgs: "/home/nieb/Projects/DAKI Mini Projects/fmlops-1/Data/images/valid/"
+val_imgs: "Data/images/valid/"
 val_txt: "Data/val.txt"
 epochs: 100                 # Number of epochs to train
-batch_size: 80              # Batch size for data loading
+batch_size: 1              # Batch size for data loading
 input_size: 384             # Input size of images
-run_name: "Baseline"        # Name of the run for wandb loggin
+run_name: "yolo_m_mosaic"        # Name of the run for wandb loggin
 # classes
 names:
   0: person
