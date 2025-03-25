@@ -89,6 +89,11 @@ def train(rank, args, params):
             for filename in reader.readlines():
                 filename = filename.rstrip().split('/')[-1]
                 filenames.append(params.get('train_imgs') + filename)
+        print("------------------------------------------------------------")
+
+        print(f"Number of files used for this training run is: {len(filenames)}")
+
+        print("------------------------------------------------------------")
 
         train_dataset = Dataset(filenames, params.get('input_size'), params, augment=params.get('augment'))
 
@@ -220,6 +225,8 @@ def train(rank, args, params):
                     outputs = model(samples)
                     vloss = criterion(outputs, targets)
                     
+
+                    #Den training loss vi logger skal også tages fra alle devices 
                     torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG)
                     v_loss.update(vloss.item(), samples.size(0))
                     
