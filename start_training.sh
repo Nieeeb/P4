@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=train_yolo
-#SBATCH --time=11:55:00
-#SBATCH --signal=B:SIGTERM@30
+#SBATCH --time=11:57:00
+#SBATCH --signal=B:SIGTERM@60
 #SBATCH --cpus-per-task=15
 #SBATCH --mem=128G
 
