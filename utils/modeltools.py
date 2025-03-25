@@ -88,7 +88,7 @@ def load_checkpoint_for_evaluation(args, params):
     state_dict = torch.load(state_path, map_location='cuda:0')
     print("-------------------------------------------")
     print("In the loading function")
-    print(state_dict)
+
     new_state_dict = OrderedDict()
     for key, item in state_dict.items():
         print("test")
