@@ -31,6 +31,9 @@ def main():
 
     args = parser.parse_args()
 
+    args.local_rank = int(os.getenv('LOCAL_RANK', 0))
+
+
     # Setting random seed for reproducability
     # Seed is 0
     util.setup_seed()
