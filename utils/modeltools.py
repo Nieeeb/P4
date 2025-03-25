@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from typing import Tuple
 from nets.nn import yolo_v8_m
+from collections import OrderedDict
 
 # Method for saving trainign state to a given path
 # Path should be a folder
@@ -76,3 +77,29 @@ def load_or_create_state(args, params):
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
             
         return model, optimizer, scheduler, starting_epoch
+
+
+
+def load_checkpoint_for_evaluation(args, params):
+    checkpoint_path = params.get('checkpoint_path')
+
+    assert Path(checkpoint_path).exists()
+    state_path = os.path.join(checkpoint_path, params.get("best_model_epoch"))
+    state_dict = torch.load(state_path, map_location='cuda:0')
+
+
+    new_state_dict = OrderedDict()
+    for key, item in state_dict.items():
+        print(key)
+    
+    
+    if state_dict['yolo_size'] == 'm':
+        model = yolo_v8_m(num_classes=4).cuda()
+        model = torch.nn.parallel.DistributedDataParallel(model)
+        model.load_state_dict(state_dict=state_dict['model'])
+
+    optimizer = state_dict['optimizer']
+    scheduler = state_dict['scheduler']
+    epoch = state_dict['epoch']
+    
+    return model, optimizer, scheduler, epoch

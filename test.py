@@ -11,8 +11,10 @@ import tqdm
 import wandb
 from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
 from utils.dataloader import prepare_loader
-from utils.modeltools import save_checkpoint, load_or_create_state
+from utils.modeltools import save_checkpoint, load_or_create_state, load_checkpoint_for_evaluation
 
+
+from collections import OrderedDict
 import numpy
 
 import torch.multiprocessing as mp
@@ -47,8 +49,11 @@ def test(args, params, model=None):
     
     # Loading model
     # Loads if a valid checkpoint is found, otherwise creates a new model
-    model, optimizer, scheduler, starting_epoch = load_or_create_state(args, params)
+    model, optimizer, scheduler, starting_epoch = load_checkpoint_for_evaluation(args, params)
 
+    
+
+    """
     if starting_epoch + 1 >= params.get('epochs'):
         print(f"Already trained for {params.get('epochs')} epochs. Exiting")
         exit
@@ -148,7 +153,9 @@ def test(args, params, model=None):
 
     # Return results
     model.float()  # for training
-    return map50, mean_ap
+    """
+    return #map50, mean_ap
+    
 
     
     if __name__ == "__main__":
