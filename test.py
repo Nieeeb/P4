@@ -51,7 +51,7 @@ def test(args, params, model=None):
     # Loads if a valid checkpoint is found, otherwise creates a new model
     model, optimizer, scheduler, starting_epoch = load_checkpoint_for_evaluation(args, params)
 
-    
+    print("in the test function")
 
     """
     if starting_epoch + 1 >= params.get('epochs'):
