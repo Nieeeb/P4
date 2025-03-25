@@ -1,51 +1,236 @@
+import yaml
 import argparse
-import copy
-import csv
 import os
 import warnings
-
-import numpy
 import torch
-import tqdm
-import yaml
-from torch.utils import data
-
-from nets import nn
 from utils import util
-from utils.dataset import Dataset
+import wandb
+from utils.modeltools import save_checkpoint, load_or_create_state
+import torch.multiprocessing as mp
+from datetime import timedelta
+from utils.dataloader import prepare_loader
 
-def train():
-    pass
+warnings.filterwarnings("ignore")
 
-def main():
+def main(): 
+    #Loading args from CLI
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-size', default=384, type=int)
-    parser.add_argument('--batch-size', default=8, type=int)
-    parser.add_argument('--local_rank', default=0, type=int)
-    parser.add_argument('--epochs', default=500, type=int)
-    parser.add_argument('--train', action='store_true')
-    parser.add_argument('--test', action='store_true')
+    parser.add_argument('--args_file', default='utils/args.yaml', type=str)
+    parser.add_argument('--world_size', default=1, type=int)
 
     args = parser.parse_args()
 
+    # args for DDP
     args.local_rank = int(os.getenv('LOCAL_RANK', 0))
-    args.world_size = int(os.getenv('WORLD_SIZE', 1))
+    print(f"Local rank: {args.local_rank}")
+    print(f"World size: {args.world_size}")
 
-    if args.world_size > 1:
-        torch.cuda.set_device(device=args.local_rank)
-        torch.distributed.init_process_group(backend='nccl', init_method='env://')
-
-    if args.local_rank == 0:
-        if not os.path.exists('weights'):
-            os.makedirs('weights')
-
+    # Setting random seed for reproducability
+    # Seed is 0
     util.setup_seed()
-    util.setup_multi_processes()
 
-    with open(os.path.join('utils', 'args.yaml'), errors='ignore') as f:
-        params = yaml.safe_load(f)
+    #Loading config
+    with open(args.args_file) as cf_file:
+        params = yaml.safe_load( cf_file.read())
+    
+    # Creating training instances for each GPU
+    mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
 
-    train(args, params)
+# Function for defining machine and port to use for DDP
+# Sets up the process group
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+    #os.environ['CUDA_VISIBLE_DEVICES'] = os.getenv('LOCAL_RANK', 0)
+    torch.cuda.set_device(rank)
+    torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size, timeout=timedelta(hours=1))
+
+# Method to gracefully destory the process group
+# If this is not done, problems may arise on future runs
+def cleanup():
+    torch.distributed.destroy_process_group()    
+
+# Function for training an entire epoch
+# Logs to wandb
+def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch):
+    m_loss = util.AverageMeter()
+
+    # If in DDP, sampler needs current epoch
+    # Used to determine which data shuffle to use if GPUs get desynced
+    if args.world_size > 1:
+        train_sampler.set_epoch(epoch)
+
+    # Iterates through the training set
+    for _, (samples, targets, _) in enumerate(train_loader):
+        # Sends data to appropriate GPU device
+        samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
+        
+        # Model set to train
+        model.train()
+        
+        optimizer.zero_grad()
+
+        samples = samples.float() / 255 # Input images are 8 bit single channel images. Converts to 0-1 floats
+
+        outputs = model(samples)  # forward pass
+        
+        loss = criterion(outputs, targets) # Calculate training loss
+
+        m_loss.update(loss.item(), samples.size(0))
+
+        loss *= params.get('batch_size')  # loss scaled by batch_size
+        loss *= args.world_size  # gradient averaged between devices in DDP mode
+
+        loss.backward() # Backpropagation
+        
+        # Logging to wandb
+        if args.local_rank == 0:
+            e = epoch + 1
+            s = _ + 1
+            step = e * s
+            wandb.log({
+                "Training step": step,
+                "Training mloss average": m_loss.avg,
+                "Raw loss": loss
+            })
+        
+        del loss # Deletes loss to save memory
+        
+        optimizer.step() # Steps the optimizer
+    
+    scheduler.step() # Step learning rate scheduler
+    
+    return m_loss
+
+# Function that validates the model on a validation set
+# Intended to be used during training and not for testing performance of model
+def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch):
+    print(f"Beginning epoch validation for epoch {epoch + 1} on GPU {args.local_rank}")     
+    v_loss = util.AverageMeter()
+    
+    # If in DDP, sampler needs current epoch
+    # Used to determine which data shuffle to use if GPUs get desynced
+    if args.world_size > 1:
+        validation_sampler.set_epoch(epoch)
+
+    # Iterates through validation set
+    # Disables gradient calculations
+    with torch.no_grad():
+        for _, (samples, targets, _) in enumerate(validation_loader):
+            # Sending data to appropriate GPU
+            samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
+            
+            samples = samples.float() / 255 # Input images are 8 bit single channel images. Converts to 0-1 floats
+            
+            outputs = model(samples) # Forward pass
+            
+            vloss = criterion(outputs, targets) # Calculating loss
+            
+            torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG) # Syncs loss and takes the average across GPUs
+            v_loss.update(vloss.item(), samples.size(0))
+            
+            del outputs
+            del vloss
+            
+    print(f"GPU {args.local_rank} has completed validation")
+        
+    return v_loss
+
+def train(rank, args, params):
+    try:
+        # Defining world size and creating/connecting to DPP instance
+        args.local_rank = rank
+        setup(rank, args.world_size)
+        
+        # Loading model
+        # Loads if a valid checkpoint is found, otherwise creates a new model
+        model, optimizer, scheduler, starting_epoch = load_or_create_state(args, params)
+
+        if starting_epoch + 1 >= params.get('epochs'):
+            print(f"Already trained for {params.get('epochs')} epochs. Exiting")
+            exit
+        
+        #Dataloading train
+        train_loader, train_sampler = prepare_loader(args, params,
+                                    file_txt=params.get('train_txt'),
+                                    img_folder=params.get('train_imgs'),
+                                    starting_epoch=starting_epoch
+                                    )
+
+        #Dataloading Validation
+        validation_loader, validation_sampler = prepare_loader(args, params,
+                                    file_txt=params.get('val_txt'),
+                                    img_folder=params.get('val_imgs'),
+                                    starting_epoch=starting_epoch
+                                    )
+        
+        # Defining loss function for training
+        criterion = util.ComputeLoss(model, params)
+        
+        # Init Wandb
+        if args.local_rank == 0:
+            wandb.init(
+                project="Thermal",
+                config=params,
+                resume="allow",
+                group=params.get('run_name'),
+                id=params.get('run_name')
+            )
+        
+        if args.local_rank == 0:
+            wandb.log({
+                'Args File': args.args_file
+            })
+        
+        # Pauses all worker threads to sync up GPUs before training
+        torch.distributed.barrier()
+        
+        # Begin training
+        for epoch in range(starting_epoch, params.get('epochs')):
+            m_loss = train_epoch(args, params,
+                        model = model,
+                        optimizer=optimizer,
+                        scheduler=scheduler,
+                        train_loader=train_loader,
+                        train_sampler=train_sampler,
+                        criterion=criterion,
+                        epoch=epoch
+                        )
+                    
+            v_loss = validate_epoch(args, params,
+                                model = model,
+                                validation_loader=validation_loader,
+                                validation_sampler=validation_sampler,
+                                criterion=criterion,
+                                epoch=epoch
+                                )    
+        
+            if args.local_rank == 0:
+                print(f"Validation for epoch {epoch} complete. Val Loss is at: {v_loss.avg}")
+                wandb.log({
+                    'Epoch': epoch + 1,
+                    'Training Epoch Loss': m_loss.avg,
+                    'Validation Loss': v_loss.avg
+                })
+                
+                del m_loss
+                del v_loss
+            
+            # Saving checkpoint
+            if args.local_rank == 0:
+                save_checkpoint(model, optimizer, scheduler, epoch + 1, params.get('checkpoint_path'), yolo_size='m')
+        
+        # Training complete
+        if args.local_rank == 0:
+                print(f"Training Completed succesfully\nTrained {params.get('epochs')} epochs")
+        
+        torch.distributed.barrier() # Pauses all worker threads to sync up GPUs
+        cleanup() # Destroy DDP process group
+            
+    except Exception as e:
+        cleanup()
+        print(e)
+        exit
 
 if __name__ == "__main__":
     main()
