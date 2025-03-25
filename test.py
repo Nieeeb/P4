@@ -158,5 +158,5 @@ def test(args, params, model=None):
     
 
     
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
