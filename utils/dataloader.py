@@ -12,6 +12,11 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1):
                 filename = filename.rstrip().split('/')[-1]
                 filenames.append(img_folder + filename)
 
+        print("----------------------------------------------------------")
+
+        print(f"Number of files used for this training run is: {len(filenames)}")
+
+        print("----------------------------------------------------------")
         dataset = Dataset(filenames, params.get('input_size'), params, augment=params.get('augment'))
         
         if args.world_size <= 1:
