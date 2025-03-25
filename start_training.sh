@@ -12,12 +12,11 @@
 max_restarts=24
 num_gpus=8
 args_file="utils/args.yaml"
-node=8
+#SBATCH --nodelist=ailab-l4-05
 
 # tweak settings to match set parameters
 #SBATCH --ntasks=$num_gpus
 #SBATCH --gres=gpu:$num_gpus
-#SBATCH --nodelist="ailab-l4-${node}"
 
 # Fetch the current restarts value from the job context
 scontext=$(scontrol show job ${SLURM_JOB_ID})
