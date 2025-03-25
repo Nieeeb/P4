@@ -53,3 +53,26 @@ def check_checkpoint(path: str) -> bool:
         return True
     else:
         return False
+
+# Given a path, first checks if a checkpoint is already saved
+# If no checkpoint is found, a new model, optimizer, and scheduler are created
+def load_or_create_state(args, params):
+        checkpoint_path = params.get('checkpoint_path')
+        starting_epoch = 0
+        if check_checkpoint(checkpoint_path):
+            model, optimizer, scheduler, starting_epoch = load_latest_checkpoint(checkpoint_path)
+            model.to(args.local_rank)
+            print(f"Checkpoint found, starting from epoch {starting_epoch + 1}")
+        else:
+            print("No checkpoint found, starting new training")
+            starting_epoch = 0
+            model = yolo_v8_m(len(params.get('names')))
+            model = model.to(args.local_rank)
+            if args.world_size > 1:
+                # DDP mode
+                model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+                model = torch.nn.parallel.DistributedDataParallel(module=model, device_ids=[args.local_rank])
+            optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
+            
+        return model, optimizer, scheduler, starting_epoch
