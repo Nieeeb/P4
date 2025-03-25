@@ -49,14 +49,12 @@ def test(args, params, model=None):
     
     # Loading model
     # Loads if a valid checkpoint is found, otherwise creates a new model
-    model, optimizer, scheduler, starting_epoch = load_checkpoint_for_evaluation(args, params)
+    model, _, _, starting_epoch = load_checkpoint_for_evaluation(args, params)
 
-    print("in the test function")
+    
 
-    """
-    if starting_epoch + 1 >= params.get('epochs'):
-        print(f"Already trained for {params.get('epochs')} epochs. Exiting")
-        exit
+   
+
     
     #Dataloading train
     train_loader, train_sampler = prepare_loader(args, params,
@@ -72,8 +70,8 @@ def test(args, params, model=None):
                                 starting_epoch=starting_epoch
                                 )
 
-    if model is None:
-        model = torch.load(params.get('best_model_path'), map_location='cuda')['model'].float()
+    # if model is None:
+    #     model = torch.load(params.get('best_model_path'), map_location='cuda')['model'].float()
 
     model.half()
     model.eval()
@@ -153,8 +151,8 @@ def test(args, params, model=None):
 
     # Return results
     model.float()  # for training
-    """
-    return #map50, mean_ap
+
+    return map50, mean_ap
     
 
     

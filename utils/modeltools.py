@@ -86,19 +86,18 @@ def load_checkpoint_for_evaluation(args, params):
     assert Path(checkpoint_path).exists()
     state_path = os.path.join(checkpoint_path, params.get("best_model_epoch"))
     state_dict = torch.load(state_path, map_location='cuda:0')
-    print("-------------------------------------------")
-    print("In the loading function")
+
 
     new_state_dict = OrderedDict()
-    for key, item in state_dict.items():
-        print("test")
-        print(key)
-    
+    for key, value in state_dict.get("model").items():
+        new_key = key[7:] 
+        new_state_dict[new_key] = value
+
     
     if state_dict['yolo_size'] == 'm':
         model = yolo_v8_m(num_classes=4).cuda()
-        model = torch.nn.parallel.DistributedDataParallel(model)
-        model.load_state_dict(state_dict=state_dict['model'])
+        # model = torch.nn.parallel.DistributedDataParallel(model)
+        model.load_state_dict(state_dict=new_state_dict)
 
     optimizer = state_dict['optimizer']
     scheduler = state_dict['scheduler']
