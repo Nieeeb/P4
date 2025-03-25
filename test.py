@@ -10,6 +10,11 @@ from torch.utils import data
 import tqdm
 import wandb
 from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_checkpoint
+from utils.dataloader import prepare_loader
+from utils.modeltools import save_checkpoint, load_or_create_state
+
+import numpy
+
 import torch.multiprocessing as mp
 import sys
 from datetime import timedelta
@@ -19,25 +24,13 @@ warnings.filterwarnings("ignore")
 def main(): 
     #Loading args from CLI
     parser = argparse.ArgumentParser()
-    #parser.add_argument('--input-size', default=384, type=int)
-    #parser.add_argument('--batch-size', default=96, type=int)
-    #parser.add_argument('--local_rank', default=0, type=int)
-    #parser.add_argument('--epochs', default=100, type=int)
-    #parser.add_argument('--train', action='store_true')
-    #parser.add_argument('--test', action='store_true')
     parser.add_argument('--args_file', default='utils/args.yaml', type=str)
     parser.add_argument('--world_size', default=1, type=int)
 
     args = parser.parse_args()
 
-    #args for DDP
-    args.local_rank = int(os.getenv('LOCAL_RANK', 0))
-    print(f"Local rank: {args.local_rank}")
-    #Vi kan prøve det sådan her og hvis AI-LAB ikke har world_size system variabel kan vi bare sætte default til 8
-    #args.world_size = int(os.getenv('WORLD_SIZE', 1))
-    #args.world_size = torch.cuda.device_count()
-    print(f"World size: {args.world_size}")
-
+    # Setting random seed for reproducability
+    # Seed is 0
     util.setup_seed()
 
     #Loading config
@@ -49,18 +42,33 @@ def main():
     
 @torch.no_grad()
 def test(args, params, model=None):
-    filenames = []
-    with open(params.get('val_txt')) as reader:
-        for filename in reader.readlines():
-            filename = filename.rstrip().split('/')[-1]
-            filenames.append('../Dataset/COCO/images/val2017/' + filename)
 
-    dataset = Dataset(filenames, args.input_size, params, False)
-    loader = data.DataLoader(dataset, 8, False, num_workers=8,
-                             pin_memory=True, collate_fn=Dataset.collate_fn)
+    
+    
+    # Loading model
+    # Loads if a valid checkpoint is found, otherwise creates a new model
+    model, optimizer, scheduler, starting_epoch = load_or_create_state(args, params)
+
+    if starting_epoch + 1 >= params.get('epochs'):
+        print(f"Already trained for {params.get('epochs')} epochs. Exiting")
+        exit
+    
+    #Dataloading train
+    train_loader, train_sampler = prepare_loader(args, params,
+                                file_txt=params.get('train_txt'),
+                                img_folder=params.get('train_imgs'),
+                                starting_epoch=starting_epoch
+                                )
+
+    #Dataloading Validation
+    validation_loader, validation_sampler = prepare_loader(args, params,
+                                file_txt=params.get('val_txt'),
+                                img_folder=params.get('val_imgs'),
+                                starting_epoch=starting_epoch
+                                )
 
     if model is None:
-        model = torch.load('./weights/best.pt', map_location='cuda')['model'].float()
+        model = torch.load(params.get('best_model_path'), map_location='cuda')['model'].float()
 
     model.half()
     model.eval()
@@ -74,7 +82,7 @@ def test(args, params, model=None):
     map50 = 0.
     mean_ap = 0.
     metrics = []
-    p_bar = tqdm.tqdm(loader, desc=('%10s' * 3) % ('precision', 'recall', 'mAP'))
+    p_bar = tqdm.tqdm(validation_loader, desc=('%10s' * 3) % ('precision', 'recall', 'mAP'))
     for samples, targets, shapes in p_bar:
         samples = samples.cuda()
         targets = targets.cuda()
