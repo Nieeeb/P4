@@ -17,7 +17,7 @@ node=8
 # tweak settings to match set parameters
 #SBATCH --ntasks=$num_gpus
 #SBATCH --gres=gpu:$num_gpus
-#SBATCH --nodelist=$node
+#SBATCH --nodelist=ailab-l4-{$node}
 
 # Fetch the current restarts value from the job context
 scontext=$(scontrol show job ${SLURM_JOB_ID})
