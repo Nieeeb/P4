@@ -60,11 +60,7 @@ def test(args, params, model=None):
 
     
     #Dataloading train
-    train_loader, train_sampler = prepare_loader(args, params,
-                                file_txt=params.get('train_txt'),
-                                img_folder=params.get('train_imgs'),
-                                starting_epoch=starting_epoch
-                                )
+
 
     #Dataloading Validation
     validation_loader, validation_sampler = prepare_loader(args, params,
