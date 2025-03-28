@@ -223,9 +223,9 @@ class Dataset(data.Dataset):
         run_name = re.search(f"{start}(.*){end}", train_txt).group(1)
         valid_name = re.search(f"{start}(.*){end}", val_txt).group(1)
         #print(run_name)
-        cache_path = f"{os.path.join(cache_parent, run_name)}_{valid_name}.cache"
-        #print(cache_path)
-        #return      
+        cache_path = f"{os.path.join(cache_parent, run_name)}_{valid_name}_{folder_name}.cache"
+        print(cache_path)
+        return      
 
         if os.path.exists(cache_path):
             print(f"Found cache: {cache_path}")
