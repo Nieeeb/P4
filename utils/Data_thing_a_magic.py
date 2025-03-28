@@ -263,12 +263,12 @@ def write_absolute_jpg_paths(dataloader, output_txt_path):
 
 
 if __name__ == "__main__":
-    dataloader = DataThingAMagic(period_begin="00000000", 
-                                 period_end="20240430", 
-                                 data_directory="Data/images/train",
+    dataloader = DataThingAMagic(period_begin="20210201", 
+                                 period_end="20210128", 
+                                 data_directory="Data/images/valid",
                                  json_directory="/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfrontv2/Valid.json",
                                  total_files=1000000000000,
                                  data_split="test1")
 
 
-    write_absolute_jpg_paths(dataloader, "Data/train.txt")
+    write_absolute_jpg_paths(dataloader, "Data/Febvalid.txt")

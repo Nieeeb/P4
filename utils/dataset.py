@@ -9,6 +9,7 @@ import torch
 from PIL import Image
 from torch.utils import data
 from tqdm import tqdm
+import re
 #from onlinetools import 
 
 FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'
@@ -22,7 +23,7 @@ class Dataset(data.Dataset):
         self.input_size = input_size
 
         # Read labels
-        cache = self.load_label(filenames)
+        cache = self.load_label(filenames, self.params)
         labels, shapes = zip(*cache.values())
         self.labels = list(labels)
         self.shapes = numpy.array(shapes, dtype=numpy.float64)
@@ -209,14 +210,27 @@ class Dataset(data.Dataset):
         return torch.stack(samples, 0), torch.cat(targets, 0), shapes
 
     @staticmethod
-    def load_label(filenames):
-        path = f'{os.path.dirname(filenames[0])}.cache'
+    def load_label(filenames, params):
+        image_path = f'{os.path.dirname(filenames[0])}'
+        #print(image_path)
+        folder_name = image_path.split(f"{os.sep}")[-1]
+        #print(folder_name)
+        cache_parent = image_path.replace(folder_name, '')
+        train_txt = params.get('train_txt')
+        start = '/'
+        end = '.txt'
+        run_name = re.search(f"{start}(.*){end}", train_txt).group(1)
+        #print(run_name)
+        cache_path = f"{os.path.join(cache_parent, run_name)}_{folder_name}.cache"
+        #print(cache_path)
+        #return      
 
-        if os.path.exists(path):
-            return torch.load(path)
+        if os.path.exists(cache_path):
+            print(f"Found cache: {cache_path}")
+            return torch.load(cache_path)
         
         x = {}
-        print("Caching images")
+        print(f"Caching {len(filenames)} images to {cache_path}")
         for filename in tqdm(filenames):
             try:
                 # verify images
@@ -251,7 +265,7 @@ class Dataset(data.Dataset):
             except FileNotFoundError:
                 print(f"misssing file {filename}")
                 pass
-        torch.save(x, path)
+        torch.save(x, cache_path)
         return x
 
 
