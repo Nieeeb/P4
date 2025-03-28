@@ -212,13 +212,18 @@ class Dataset(data.Dataset):
     @staticmethod
     def load_label(filenames, params):
         image_path = f'{os.path.dirname(filenames[0])}'
+        #print(image_path)
         folder_name = image_path.split(f"{os.sep}")[-1]
+        #print(folder_name)
         cache_parent = image_path.replace(folder_name, '')
         train_txt = params.get('train_txt')
         start = '/'
         end = '.txt'
         run_name = re.search(f"{start}(.*){end}", train_txt).group(1)
-        cache_path = f"{os.path.join(cache_parent, run_name)}.cache"      
+        #print(run_name)
+        cache_path = f"{os.path.join(cache_parent, run_name)}_{folder_name}.cache"
+        #print(cache_path)
+        #return      
 
         if os.path.exists(cache_path):
             print(f"Found cache: {cache_path}")
