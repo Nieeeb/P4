@@ -217,11 +217,13 @@ class Dataset(data.Dataset):
         #print(folder_name)
         cache_parent = image_path.replace(folder_name, '')
         train_txt = params.get('train_txt')
+        val_txt = params.get('val_txt')
         start = '/'
         end = '.txt'
         run_name = re.search(f"{start}(.*){end}", train_txt).group(1)
+        valid_name = re.search(f"{start}(.*){end}", val_txt).group(1)
         #print(run_name)
-        cache_path = f"{os.path.join(cache_parent, run_name)}_{folder_name}.cache"
+        cache_path = f"{os.path.join(cache_parent, run_name)}_{valid_name}.cache"
         #print(cache_path)
         #return      
 
