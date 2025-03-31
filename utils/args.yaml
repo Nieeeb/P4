@@ -29,7 +29,7 @@ epochs: 100                 # Number of epochs to train
 batch_size: 80              # Batch size for data loading
 input_size: 384             # Input size of images
 run_name: "yolo_m_testing"        # Name of the run for wandb loggin
-augment: True               # Augment or not
+augment: False               # Augment or not
 
 best_model_epoch: "11"
 # classes
