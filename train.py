@@ -61,10 +61,9 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         train_sampler.set_epoch(epoch)
 
     # Iterates through the training set
-    for _, (samples, targets, _) in enumerate(train_loader):
+    for batchidx, (samples, targets, shapes) in enumerate(train_loader):
         # Sends data to appropriate GPU device
         samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
-        
         # Model set to train
         model.train()
         
@@ -73,7 +72,7 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         samples = samples.float() / 255 # Input images are 8 bit single channel images. Converts to 0-1 floats
 
         outputs = model(samples)  # forward pass
-        
+
         loss = criterion(outputs, targets) # Calculate training loss
 
         m_loss.update(loss.item(), samples.size(0))
@@ -82,22 +81,22 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         loss *= args.world_size  # gradient averaged between devices in DDP mode
 
         loss.backward() # Backpropagation
-        
+
         # Logging to wandb
         if args.local_rank == 0:
             e = epoch + 1
-            s = _ + 1
+            s = batchidx + 1
             step = e * s
             wandb.log({
                 "Training step": step,
                 "Training mloss average": m_loss.avg,
                 "Raw loss": loss
             })
-        
+
         del loss # Deletes loss to save memory
         
         optimizer.step() # Steps the optimizer
-    
+
     scheduler.step() # Step learning rate scheduler
     
     return m_loss
@@ -116,7 +115,7 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
     # Iterates through validation set
     # Disables gradient calculations
     with torch.no_grad():
-        for _, (samples, targets, _) in enumerate(validation_loader):
+        for batchidx, (samples, targets, shapes) in enumerate(validation_loader):
             # Sending data to appropriate GPU
             samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
             
@@ -186,7 +185,9 @@ def train(rank, args, params):
         torch.distributed.barrier()
         
         # Begin training
+        print("Beginning training...")
         for epoch in range(starting_epoch, params.get('epochs')):
+            print(f"Traning for epoch {epoch + 1}")
             m_loss = train_epoch(args, params,
                         model = model,
                         optimizer=optimizer,
@@ -196,7 +197,7 @@ def train(rank, args, params):
                         criterion=criterion,
                         epoch=epoch
                         )
-                    
+            print(f"Validation for epoch {epoch + 1}")
             v_loss = validate_epoch(args, params,
                                 model = model,
                                 validation_loader=validation_loader,

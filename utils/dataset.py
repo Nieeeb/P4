@@ -34,6 +34,7 @@ class Dataset(data.Dataset):
         self.albumentations = Albumentations()
 
     def __getitem__(self, index):
+        #print("I am being called")
         index = self.indices[index]
 
         params = self.params
@@ -63,13 +64,16 @@ class Dataset(data.Dataset):
             shapes = shape, ((h / shape[0], w / shape[1]), pad)  # for COCO mAP rescaling
 
             label = self.labels[index].copy()
+            #print(f"Beforre: {label}")
             if label.size:
                 label[:, 1:] = wh2xy(label[:, 1:], ratio[0] * w, ratio[1] * h, pad[0], pad[1])
+                #print(f"middle: {label}")
             # if self.augment:
             #     image, label = random_perspective(image, label, params)
         nl = len(label)  # number of labels
         if nl:
             label[:, 1:5] = xy2wh(label[:, 1:5], image.shape[1], image.shape[0])
+            #print(f"After: {label}")
             #label[:, 1:5] = xy2wh(label[:, 1:5], image.size[1], image.size[0])
 
         # if self.augment:
@@ -283,9 +287,9 @@ def wh2xy(x, w=640, h=640, pad_w=0, pad_h=0):
 
 def xy2wh(x, w=640, h=640):
     # warning: inplace clip
-    x[:, [0, 2]] = x[:, [0, 2]].clip(0, w - 1E-3)  # x1, x2
-    x[:, [1, 3]] = x[:, [1, 3]].clip(0, h - 1E-3)  # y1, y2
-
+    #x[:, [0, 2]] = x[:, [0, 2]].clip(0, w - 1E-3)  # x1, x2
+    #x[:, [1, 3]] = x[:, [1, 3]].clip(0, h - 1E-3)  # y1, y2
+    
     # Convert nx4 boxes
     # from [x1, y1, x2, y2] to [x, y, w, h] normalized where xy1=top-left, xy2=bottom-right
     y = numpy.copy(x)
