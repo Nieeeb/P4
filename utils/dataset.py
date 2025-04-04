@@ -65,14 +65,14 @@ class Dataset(data.Dataset):
 
             label = self.labels[index].copy()
             #print(f"Beforre: {label}")
-            if label.size:
-                label[:, 1:] = wh2xy(label[:, 1:], ratio[0] * w, ratio[1] * h, pad[0], pad[1])
+            #if label.size:
+            #    label[:, 1:] = wh2xy(label[:, 1:], ratio[0] * w, ratio[1] * h, pad[0], pad[1])
                 #print(f"middle: {label}")
             # if self.augment:
             #     image, label = random_perspective(image, label, params)
         nl = len(label)  # number of labels
-        if nl:
-            label[:, 1:5] = xy2wh(label[:, 1:5], image.shape[1], image.shape[0])
+        #if nl:
+        #    label[:, 1:5] = xy2wh(label[:, 1:5], image.shape[1], image.shape[0])
             #print(f"After: {label}")
             #label[:, 1:5] = xy2wh(label[:, 1:5], image.size[1], image.size[0])
 

@@ -49,8 +49,8 @@ def display_boxes(samples, targets, shapes):
             tbox[:, 2] = labels[:, 1] + labels[:, 3] / 2  # bottom right x
             tbox[:, 3] = labels[:, 2] + labels[:, 4] / 2  # bottom right y
             
-            util.scale(tbox, samples[i].shape[1:], shapes[i][0], shapes[i][1])
-            #util.scale(tbox, samples[i].shape[1:], shapes[i][0], None)
+            #util.scale(tbox, samples[i].shape[1:], shapes[i][0], shapes[i][1])
+            util.scale(tbox, samples[i].shape[1:], shapes[i][0], None)
             
             image = np.transpose(sample.cpu().numpy(), (1, 2, 0))
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
