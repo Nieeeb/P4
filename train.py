@@ -85,7 +85,7 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         # Logging to wandb
         if args.local_rank == 0:
             e = epoch + 1
-            s = batchidx + 1
+            s = batchidx * len(train_loader) + 1
             step = e * s
             wandb.log({
                 "Training step": step,
@@ -185,9 +185,11 @@ def train(rank, args, params):
         torch.distributed.barrier()
         
         # Begin training
-        print("Beginning training...")
+        if args.local_rank == 0:
+            print("Beginning training...")
         for epoch in range(starting_epoch, params.get('epochs')):
-            print(f"Traning for epoch {epoch + 1}")
+            if args.local_rank == 0:
+                print(f"Traning for epoch {epoch + 1}")
             m_loss = train_epoch(args, params,
                         model = model,
                         optimizer=optimizer,
@@ -197,7 +199,8 @@ def train(rank, args, params):
                         criterion=criterion,
                         epoch=epoch
                         )
-            print(f"Validation for epoch {epoch + 1}")
+            if args.local_rank == 0:
+                print(f"Validation for epoch {epoch + 1}")
             v_loss = validate_epoch(args, params,
                                 model = model,
                                 validation_loader=validation_loader,
