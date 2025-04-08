@@ -84,9 +84,9 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
 
         # Logging to wandb
         if args.local_rank == 0:
-            e = epoch + 1
-            s = batchidx * len(train_loader) + 1
-            step = e * s
+            e = epoch * len(train_loader) + 1
+            s = batchidx + 1
+            step = e + s
             wandb.log({
                 "Training step": step,
                 "Training mloss average": m_loss.avg,
