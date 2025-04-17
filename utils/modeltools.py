@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from typing import Tuple
 from nets.nn import yolo_v8_m
+from nets.autoencoder import DeepAutoencoder
 from collections import OrderedDict
 
 # Method for saving trainign state to a given path
@@ -39,6 +40,11 @@ def load_latest_checkpoint(path: str): #-> Tuple[torch.nn.Module | torch.nn.para
         model = torch.nn.parallel.DistributedDataParallel(model)
         model.load_state_dict(state_dict=state_dict['model'])
 
+    if state_dict['yolo_size'] == 'ae':
+        model = DeepAutoencoder()
+        model = torch.nn.parallel.DistributedDataParallel(model)
+        model.load_state_dict(state_dict=state_dict['model'])
+        
     optimizer = state_dict['optimizer']
     scheduler = state_dict['scheduler']
     epoch = state_dict['epoch']
@@ -67,7 +73,12 @@ def load_or_create_state(args, params):
         else:
             print("No checkpoint found, starting new training")
             starting_epoch = 0
-            model = yolo_v8_m(len(params.get('names')))
+            
+            if params.get("model") == "yolo":
+                model = yolo_v8_m(len(params.get('names')))
+            elif params.get("model") == "deep_ae":
+                model = DeepAutoencoder()
+            
             model = model.to(args.local_rank)
             if args.world_size > 1:
                 # DDP mode

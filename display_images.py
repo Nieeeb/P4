@@ -130,31 +130,73 @@ def main():
     # Disables gradient calculations
     with torch.no_grad():
         model.eval()
-        boxes_list = []
-        tboxes_list = []
         for data_idx, (samples, targets, shapes) in tqdm(enumerate(train_loader), total=len(train_loader)):
             # Sending data to appropriate GPU
             samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
             
-            #scaled_samples = samples / 255
+            samples = samples / 255
             # Inference
-            #outputs = model(scaled_samples)
-            target_boxes = []
-            for target in targets:
-                tbox = [target[2].item(), target[3].item(), target[4].item(), target[5].item()]
-                target_boxes.append(tbox)
-            tboxes_list.append(target_boxes)
+            outputs = model(samples)
+            for output in outputs:
+                for row in output[1]:
+                    print(row)
             
-            images, boxes = display_targets(samples, targets, shapes)
-            boxes_list.append(boxes)
+            #rows = outputs.shape[1]
+            
+            boxes = []
+            scores = []
+            class_ids = []
+            CLASSES = [
+                    'person',
+                    'bike',
+                    'motorcycle',
+                    'vehicle'
+                    ]
+            
+            
+            # Iterate through output to collect bounding boxes, confidence scores, and class IDs
+            for i in range(rows):
+                classes_scores = outputs[1][i][4:]
+                print(classes_scores)
+                (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
+                if maxScore >= 0.25:
+                    box = [
+                        outputs[0][i][0] - (0.5 * outputs[0][i][2]),  # x center - width/2 = left x
+                        outputs[0][i][1] - (0.5 * outputs[0][i][3]),  # y center - height/2 = top y
+                        outputs[0][i][2],  # width
+                        outputs[0][i][3],  # height
+                    ]
+                    boxes.append(box)
+                    scores.append(maxScore)
+                    class_ids.append(maxClassIndex)
+
+            # Apply NMS (Non-maximum suppression)
+            result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.45, 0.5)
+
+            detections = []
+
+            # Iterate through NMS results to draw bounding boxes and labels
+            for i in range(len(result_boxes)):
+                index = result_boxes[i]
+                box = boxes[index]
+                detection = {
+                    "class_id": class_ids[index],
+                    "class_name": CLASSES[class_ids[index]],
+                    "confidence": scores[index],
+                    "box": box,
+                }
+                detections.append(detection)
+                print(detection)
+            
+            #images, boxes = display_targets(samples, targets, shapes)
             #print(boxes)
             # Does not work yet
-            #images = display_outputs(samples, outputs, shapes)
+            #images, boxes = display_outputs(samples, outputs, shapes)
             
-            for i, image in enumerate(images):
-                cv2.imshow(f"{i}", image)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            #for i, image in enumerate(images):
+            #    cv2.imshow(f"{i}", image)
+            #cv2.waitKey(0)
+            #cv2.destroyAllWindows()
             break
     #cv2.waitKey(0)
     #cv2.destroyAllWindows()
