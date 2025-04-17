@@ -1,4 +1,4 @@
-# Creating a DeepAutoencoder class 
+# https://www.geeksforgeeks.org/implement-convolutional-autoencoder-in-pytorch-with-cuda/
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
