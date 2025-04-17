@@ -56,7 +56,7 @@ def train(rank, args, params):
                                     file_txt=params.get('train_txt'),
                                     img_folder=params.get('train_imgs'),
                                     starting_epoch=starting_epoch,
-                                    num_workers=32
+                                    num_workers=64
                                     )
 
         #Dataloading Validation
@@ -64,7 +64,7 @@ def train(rank, args, params):
                                     file_txt=params.get('val_txt'),
                                     img_folder=params.get('val_imgs'),
                                     starting_epoch=starting_epoch,
-                                    num_workers=32
+                                    num_workers=64
                                     )
         
         # Defining loss function for training
