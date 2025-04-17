@@ -26,10 +26,11 @@ train_txt: "Data/train.txt"
 val_imgs: "Data/images/valid/"
 val_txt: "Data/val.txt"
 epochs: 100                 # Number of epochs to train
-batch_size: 80              # Batch size for data loading
+batch_size: 10              # Batch size for data loading
 input_size: 384             # Input size of images
 run_name: "yolo_m_testing"        # Name of the run for wandb loggin
 augment: False               # Augment or not
+model_type: "deep_ae"           # What model to use. Usually deep_ae or yolo
 
 best_model_epoch: "11"
 # classes

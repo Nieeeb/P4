@@ -52,7 +52,7 @@ def cleanup():
 
 # Function for training an entire epoch
 # Logs to wandb
-def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch):
+def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch, model_type="yolo"):
     m_loss = util.AverageMeter()
 
     # If in DDP, sampler needs current epoch
@@ -72,8 +72,10 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         samples = samples.float() / 255 # Input images are 8 bit single channel images. Converts to 0-1 floats
 
         outputs = model(samples)  # forward pass
-
-        loss = criterion(outputs, targets) # Calculate training loss
+        if model_type == "yolo":
+            loss = criterion(outputs, targets) # Calculate training loss
+        elif model_type == "deep_ae":
+            loss = criterion(outputs, samples)
 
         m_loss.update(loss.item(), samples.size(0))
 
@@ -103,7 +105,7 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
 
 # Function that validates the model on a validation set
 # Intended to be used during training and not for testing performance of model
-def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch):
+def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch, model_type="yolo"):
     print(f"Beginning epoch validation for epoch {epoch + 1} on GPU {args.local_rank}")     
     v_loss = util.AverageMeter()
     
@@ -123,7 +125,10 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
             
             outputs = model(samples) # Forward pass
             
-            vloss = criterion(outputs, targets) # Calculating loss
+            if model_type == "yolo":
+                vloss = criterion(outputs, targets) # Calculate loss
+            elif model_type == "deep_ae":
+                vloss = criterion(outputs, samples)
             
             torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG) # Syncs loss and takes the average across GPUs
             v_loss.update(vloss.item(), samples.size(0))
@@ -197,7 +202,8 @@ def train(rank, args, params):
                         train_loader=train_loader,
                         train_sampler=train_sampler,
                         criterion=criterion,
-                        epoch=epoch
+                        epoch=epoch,
+                        model_type=params.get("model_type")
                         )
             if args.local_rank == 0:
                 print(f"Validation for epoch {epoch + 1}")
@@ -206,7 +212,8 @@ def train(rank, args, params):
                                 validation_loader=validation_loader,
                                 validation_sampler=validation_sampler,
                                 criterion=criterion,
-                                epoch=epoch
+                                epoch=epoch,
+                                model_type=params.get("model_type")
                                 )    
         
             if args.local_rank == 0:
