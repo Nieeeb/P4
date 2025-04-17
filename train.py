@@ -158,14 +158,16 @@ def train(rank, args, params):
         train_loader, train_sampler = prepare_loader(args, params,
                                     file_txt=params.get('train_txt'),
                                     img_folder=params.get('train_imgs'),
-                                    starting_epoch=starting_epoch
+                                    starting_epoch=starting_epoch,
+                                    num_workers=16
                                     )
 
         #Dataloading Validation
         validation_loader, validation_sampler = prepare_loader(args, params,
                                     file_txt=params.get('val_txt'),
                                     img_folder=params.get('val_imgs'),
-                                    starting_epoch=starting_epoch
+                                    starting_epoch=starting_epoch,
+                                    num_workers=16
                                     )
         
         # Defining loss function for training
