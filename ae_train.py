@@ -58,7 +58,7 @@ def train(rank, args, params):
                                     starting_epoch=starting_epoch,
                                     num_workers=32
                                     )
-        train_loader()
+
         #Dataloading Validation
         validation_loader, validation_sampler = prepare_loader(args, params,
                                     file_txt=params.get('val_txt'),
