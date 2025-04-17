@@ -41,7 +41,7 @@ def load_latest_checkpoint(path: str): #-> Tuple[torch.nn.Module | torch.nn.para
         model.load_state_dict(state_dict=state_dict['model'])
 
     if state_dict['yolo_size'] == 'ae':
-        model = ConvAutoencoder()
+        model = ConvAutoencoder().cuda()
         model = torch.nn.parallel.DistributedDataParallel(model)
         model.load_state_dict(state_dict=state_dict['model'])
         
