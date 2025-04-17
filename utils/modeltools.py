@@ -77,7 +77,7 @@ def load_or_create_state(args, params):
             if params.get("model_type") == "yolo":
                 model = yolo_v8_m(len(params.get('names')))
             elif params.get("model_type") == "deep_ae":
-                model = ConvAutoencoder()
+                model = ConvAutoencoder().cuda()
             
             model = model.to(args.local_rank)
             if args.world_size > 1:
