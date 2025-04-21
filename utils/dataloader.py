@@ -21,7 +21,7 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_wo
         if args.world_size <= 1:
             sampler = None
         else:
-            sampler = data.DistributedSampler(dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=True, drop_last=False)
+            sampler = data.DistributedSampler(dataset, num_replicas=args.world_size, rank=args.local_rank, shuffle=False, drop_last=False)
             sampler.set_epoch(starting_epoch)
         
         loader = data.DataLoader(dataset, params.get('batch_size'), sampler=sampler,

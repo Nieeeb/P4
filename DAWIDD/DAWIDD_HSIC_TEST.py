@@ -47,28 +47,23 @@ class DAWIDD_HSIC:
                  nfe: int = 64,
                  nfd: int = 64,
                  nz: int = 256,
-                 device: str = 'gpu',
+                 device: str = 'cuda',
                  max_window_size: int = 90,
                  min_window_size: int = 70,
-                 hsic_threshold: float = 1e-3):
+                 hsic_threshold: float = 1e-3,
+                 disable_drift_reset: bool = True):
         """
-        ckpt_path: path to your .pt/.pth checkpoint (state_dict or DDP checkpoint).
-        nc, nfe, nfd, nz: same arch params you used in training.
-        device: 'cpu' or 'cuda'.
+        disable_drift_reset=True will skip the shrink/reset logic and only record HSIC values
         """
         self.device = torch.device(device)
         # build and load your AE
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
-        # support either raw state_dict or {'model_state_dict': ...}
-        # ckpt is what you torch.load(...)ed
-        raw = ckpt.get('model', ckpt)   # or however you extracted the dict
-        # strip the DDP/DataParallel prefix:
-        stripped = { k.replace('module.', ''): v for k, v in raw.items() }
+        raw = ckpt.get('model_state_dict', ckpt)
+        stripped = {k.replace('module.', ''): v for k, v in raw.items()}
         self.model.load_state_dict(stripped)
         self.model.eval()
 
-        # we'll only use the encoder
         self.encoder = self.model.encoder
 
         # sliding-window params
@@ -76,22 +71,21 @@ class DAWIDD_HSIC:
         self.min_window_size = min_window_size
         self.min_n_items = int(min_window_size / 4)
         self.hsic_threshold = hsic_threshold
+        self.disable_drift_reset = disable_drift_reset
 
         # buffers
-        self.Z = []              # list of 1d np arrays (latent codes)
+        self.Z = []              # list of latent codes
         self.n_items = 0
-        self.drift_detected = False
-        self.hsic_history = []
+        self.hsic_history = []   # record all HSIC values
 
     def _test_for_independence(self) -> float:
-        Z = np.vstack(self.Z)                   # (n_items, nz)
+        Z = np.vstack(self.Z)
         t = np.arange(self.n_items, dtype=float)
         t = (t - t.mean()) / t.std()
         return HSIC(Z, t.reshape(-1, 1))
 
     def add_batch(self, z: np.ndarray):
-        """Add one latent code and update both drift flag and history."""
-        self.drift_detected = False
+        """Add one latent code and record HSIC value."""
         self.Z.append(z)
         self.n_items += 1
 
@@ -100,45 +94,34 @@ class DAWIDD_HSIC:
             self.Z.pop(0)
             self.n_items -= 1
 
-        # compute HSIC if we have enough samples; else mark as None
+        # compute HSIC if we have enough samples; else zero
         if self.n_items >= self.min_window_size:
             hsic_val = self._test_for_independence()
         else:
-            hsic_val = 0
+            hsic_val = 0.0
 
-        # *** record it every time ***
+        # record HSIC every step
         self.hsic_history.append(hsic_val)
 
-        # now check for drift *only* if we actually have a value
-        if hsic_val is not None and hsic_val >= self.hsic_threshold:
-            self.drift_detected = True
-            # shrink window until below threshold or at min size
-            while hsic_val >= self.hsic_threshold and self.n_items > self.min_n_items:
-                self.Z.pop(0)
-                self.n_items -= 1
-                hsic_val = self._test_for_independence()
+        # optionally skip drift reset logic
+        if not self.disable_drift_reset:
+            if hsic_val >= self.hsic_threshold:
+                # shrink window until below threshold or at min size
+                while hsic_val >= self.hsic_threshold and self.n_items > self.min_n_items:
+                    self.Z.pop(0)
+                    self.n_items -= 1
+                    hsic_val = self._test_for_independence()
 
-    def set_input(self, img) -> bool:
-        """
-        img: either a torch.Tensor of shape (C,H,W) or a numpy array;
-             must already be preprocessed just like during AE training.
-        Returns True if drift was flagged at this step.
-        """
-        # to torch tensor, add batch dim, to device
+    def set_input(self, img) -> None:
+        """Process one image/sample and update HSIC history."""
         if isinstance(img, np.ndarray):
             img = torch.from_numpy(img)
         if img.ndim == 3:
-            img = img.unsqueeze(0)               # (1,C,H,W)
+            img = img.unsqueeze(0)
         img = img.to(self.device).float()
 
-        # encode → (1, nz, 1, 1)  → flatten to (nz,)
         with torch.no_grad():
             z = self.encoder(img)
         z = z.view(z.size(0), -1).cpu().numpy()[0]
 
         self.add_batch(z)
-        return self.drift_detected
-
-    def detected_change(self) -> bool:
-        """Query whether the last .add_batch() triggered a drift."""
-        return self.drift_detected
