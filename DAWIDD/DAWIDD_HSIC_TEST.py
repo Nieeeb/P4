@@ -90,29 +90,33 @@ class DAWIDD_HSIC:
         return HSIC(Z, t.reshape(-1, 1))
 
     def add_batch(self, z: np.ndarray):
+        """Add one latent code and update both drift flag and history."""
         self.drift_detected = False
         self.Z.append(z)
         self.n_items += 1
 
-        # enforce maximum window
+        # enforce max window
         if self.n_items > self.max_window_size:
             self.Z.pop(0)
             self.n_items -= 1
 
-        # compute HSIC if we have enough samples
+        # compute HSIC if we have enough samples; else mark as None
         if self.n_items >= self.min_window_size:
             hsic_val = self._test_for_independence()
-            self.hsic_history.append(hsic_val)    # record it
-            if hsic_val >= self.hsic_threshold:
-                self.drift_detected = True
-                # shrink window until below threshold
-                while hsic_val >= self.hsic_threshold and self.n_items > self.min_n_items:
-                    self.Z.pop(0)
-                    self.n_items -= 1
-                    hsic_val = self._test_for_independence()
         else:
-            # not enough points yet → record NaN or None
-            self.hsic_history.append(None)
+            hsic_val = 0
+
+        # *** record it every time ***
+        self.hsic_history.append(hsic_val)
+
+        # now check for drift *only* if we actually have a value
+        if hsic_val is not None and hsic_val >= self.hsic_threshold:
+            self.drift_detected = True
+            # shrink window until below threshold or at min size
+            while hsic_val >= self.hsic_threshold and self.n_items > self.min_n_items:
+                self.Z.pop(0)
+                self.n_items -= 1
+                hsic_val = self._test_for_independence()
 
     def set_input(self, img) -> bool:
         """
