@@ -4,7 +4,7 @@ from torch.utils import data
 
 warnings.filterwarnings("ignore")
 
-def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1):
+def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_workers=16):
         #Dataloading train 
         filenames = []
         
@@ -25,6 +25,6 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1):
             sampler.set_epoch(starting_epoch)
         
         loader = data.DataLoader(dataset, params.get('batch_size'), sampler=sampler,
-                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+                                num_workers=num_workers, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
         
         return loader, sampler

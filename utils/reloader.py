@@ -13,11 +13,11 @@ base_img_dir = "/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfront
 dataset_split = "valid"  # Change as needed
 
 # Define the output directory where both images and labels will be saved
-images_dir = os.path.join('Data', 'Images', dataset_split)
+images_dir = os.path.join('Data', 'images', dataset_split)
 os.makedirs(images_dir, exist_ok=True)
 
 
-labels_dir = os.path.join('Data', 'Labels', dataset_split)
+labels_dir = os.path.join('Data', 'labels', dataset_split)
 
 # Create output directories if they don't exist
 os.makedirs(labels_dir, exist_ok=True)
