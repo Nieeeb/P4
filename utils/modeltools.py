@@ -105,6 +105,7 @@ def load_checkpoint_for_evaluation(args, params):
         new_state_dict[new_key] = value
 
     
+    
     if state_dict['yolo_size'] == 'm':
         model = yolo_v8_m(num_classes=4).cuda()
         # model = torch.nn.parallel.DistributedDataParallel(model)
