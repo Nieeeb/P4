@@ -1,4 +1,4 @@
-from DAWIDD.DAWIDD_HSIC_TEST import DAWIDD_HSIC
+from DAWIDD_HSIC_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 import argparse
 import os
