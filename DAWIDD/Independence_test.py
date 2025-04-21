@@ -49,13 +49,18 @@ validation_loader, validation_sampler = prepare_loader(args, params,
 
 
 idx = 0
-drift_idx = None
 
 for batch in validation_loader:
-    images = batch[0]           # batch[0] is your (B, C, H, W) tensor
-    for img in images:          # img is each (C, H, W) image
-        if detector.set_input(img):
-            drift_idx = idx
-            print(f">>> Drift detected at dataset index {drift_idx}")
-            break
+    images = batch[0]
+    for img in images:
+        detector.set_input(img)
         idx += 1
+
+# now write CSV of the history
+import csv
+with open('hsic_over_time.csv', 'w', newline='') as f:
+    w = csv.writer(f)
+    w.writerow(['dataset_index','hsic'])
+    for i, h in enumerate(detector.hsic_history):
+        w.writerow([i, h])
+print("Wrote hsic_over_time.csv with", len(detector.hsic_history), "rows")

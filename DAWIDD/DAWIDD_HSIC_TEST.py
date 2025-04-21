@@ -81,6 +81,7 @@ class DAWIDD_HSIC:
         self.Z = []              # list of 1d np arrays (latent codes)
         self.n_items = 0
         self.drift_detected = False
+        self.hsic_history = []
 
     def _test_for_independence(self) -> float:
         Z = np.vstack(self.Z)                   # (n_items, nz)
@@ -89,26 +90,29 @@ class DAWIDD_HSIC:
         return HSIC(Z, t.reshape(-1, 1))
 
     def add_batch(self, z: np.ndarray):
-        """Add one latent code (1d numpy array) and update drift status."""
         self.drift_detected = False
         self.Z.append(z)
         self.n_items += 1
 
-        # enforce max window
+        # enforce maximum window
         if self.n_items > self.max_window_size:
             self.Z.pop(0)
             self.n_items -= 1
 
-        # once we have enough, compute HSIC
+        # compute HSIC if we have enough samples
         if self.n_items >= self.min_window_size:
             hsic_val = self._test_for_independence()
+            self.hsic_history.append(hsic_val)    # record it
             if hsic_val >= self.hsic_threshold:
                 self.drift_detected = True
-                # shrink window until below threshold or at min size
+                # shrink window until below threshold
                 while hsic_val >= self.hsic_threshold and self.n_items > self.min_n_items:
                     self.Z.pop(0)
                     self.n_items -= 1
                     hsic_val = self._test_for_independence()
+        else:
+            # not enough points yet → record NaN or None
+            self.hsic_history.append(None)
 
     def set_input(self, img) -> bool:
         """
