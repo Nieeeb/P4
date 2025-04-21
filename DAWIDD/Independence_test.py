@@ -49,8 +49,9 @@ validation_loader, validation_sampler = prepare_loader(args, params,
 
 
 # stream your data (e.g. from a DataLoader)
-for batch in validation_loader:     # batch shape (B, C, H, W)
-    for img in batch:
+for images, _ in validation_loader:     # unpack the tuple
+    # images has shape (B, C, H, W)
+    for img in images:                  # now img is each (C, H, W) image
         if detector.set_input(img):
             print(">>> Drift detected!")
             break
