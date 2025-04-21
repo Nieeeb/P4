@@ -48,10 +48,9 @@ validation_loader, validation_sampler = prepare_loader(args, params,
                             )
 
 
-# stream your data (e.g. from a DataLoader)
-for images, _ in validation_loader:     # unpack the tuple
-    # images has shape (B, C, H, W)
-    for img in images:                  # now img is each (C, H, W) image
+for batch in validation_loader:
+    images = batch[0]           # assume element 0 is your (B, C, H, W) tensor
+    for img in images:          # img now has shape (C, H, W)
         if detector.set_input(img):
             print(">>> Drift detected!")
             break
