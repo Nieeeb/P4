@@ -1,7 +1,16 @@
 import torch
 import numpy as np
 from torch import nn
-from nets.autoencoder import ConvAutoencoder  # replace with your actual import
+
+import sys, os
+
+# compute P4 directory (one level up from DAWIDD/)
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+# now this will work:
+from nets.autoencoder import ConvAutoencoder
 
 # ---- HSIC machinery (unchanged) ----
 
