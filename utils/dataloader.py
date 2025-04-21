@@ -7,6 +7,7 @@ warnings.filterwarnings("ignore")
 def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1):
         #Dataloading train 
         filenames = []
+        
         with open(file_txt) as reader:
             for filename in reader.readlines():
                 filename = filename.rstrip().split('/')[-1]

@@ -38,7 +38,7 @@ def main():
     
     # Loading model
         # Loads if a valid checkpoint is found, otherwise creates a new model
-    model, optimizer, scheduler, starting_epoch = load_or_create_state(args, params)
+    # model, optimizer, scheduler, starting_epoch = load_or_create_state(args, params)
     
     #Dataloading train
     #train_loader, train_sampler = prepare_loader(args, params,
