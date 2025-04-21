@@ -56,7 +56,7 @@ validation_loader, validation_sampler = prepare_loader(args, params,
 
 
 idx = 0
-for batch in tqdm(validation_loader, desc="Validation batches"):
+for batch in tqdm.tqdm(validation_loader, desc="Validation batches"):
     images = batch[0]
     for img in images:
         for det in detectors.values():
