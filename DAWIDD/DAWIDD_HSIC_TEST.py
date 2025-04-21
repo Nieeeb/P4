@@ -61,8 +61,11 @@ class DAWIDD_HSIC:
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         # support either raw state_dict or {'model_state_dict': ...}
-        state_dict = ckpt.get("model", ckpt)
-        self.model.load_state_dict(state_dict)
+        # ckpt is what you torch.load(...)ed
+        raw = ckpt.get('model', ckpt)   # or however you extracted the dict
+        # strip the DDP/DataParallel prefix:
+        stripped = { k.replace('module.', ''): v for k, v in raw.items() }
+        self.model.load_state_dict(stripped)
         self.model.eval()
 
         # we'll only use the encoder
