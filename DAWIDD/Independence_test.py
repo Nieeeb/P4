@@ -52,7 +52,7 @@ for batch in validation_loader:
     images = batch[0]           # assume element 0 is your (B, C, H, W) tensor
     for img in images:          # img now has shape (C, H, W)
         if detector.set_input(img):
-            print(">>> Drift detected!")
+            print(f">>> Drift detected at batch: {batch}!")
             break
     if detector.detected_change():
         break
