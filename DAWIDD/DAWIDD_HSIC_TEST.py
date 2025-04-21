@@ -59,7 +59,7 @@ class DAWIDD_HSIC:
         # build and load your AE
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
-        raw = ckpt.get('model_state_dict', ckpt)
+        raw = ckpt.get('model', ckpt)
         stripped = {k.replace('module.', ''): v for k, v in raw.items()}
         self.model.load_state_dict(stripped)
         self.model.eval()
