@@ -61,7 +61,7 @@ class DAWIDD_HSIC:
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         # support either raw state_dict or {'model_state_dict': ...}
-        state_dict = ckpt.get('model_state_dict', ckpt)
+        state_dict = ckpt.get("model", ckpt)
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
