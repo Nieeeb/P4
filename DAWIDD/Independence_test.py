@@ -29,7 +29,7 @@ with open(args.args_file) as cf_file:
 
 
 detector = DAWIDD_HSIC(
-    ckpt_path = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/checkpoint_epoch_100.pth',
+    ckpt_path = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100.pth',
     nc=1, nfe=64, nfd=64, nz=256,
     device='cuda',
     max_window_size=90,
