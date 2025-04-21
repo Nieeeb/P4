@@ -5,6 +5,7 @@ import os
 from utils import util
 import yaml
 import pandas as pd
+import tqdm
 
 
 #Loading args from CLI
@@ -55,7 +56,7 @@ validation_loader, validation_sampler = prepare_loader(args, params,
 
 
 idx = 0
-for batch in validation_loader:
+for batch in tqdm(validation_loader, desc="Validation batches"):
     images = batch[0]
     for img in images:
         for det in detectors.values():
