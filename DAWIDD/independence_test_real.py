@@ -76,9 +76,8 @@ def main():
             z_batch = encoder(images).view(len(images), -1).cpu().numpy()
 
         # feed each latent to every detector
-        for z in z_batch:
-            for det in detectors.values():
-                det.add_batch(z)
+        for det in detectors.values():
+            det.add_batch(z_batch)
 
     # write out CSVs
     for name, det in detectors.items():
