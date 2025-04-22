@@ -14,7 +14,7 @@ def main():
     parser.add_argument('--args_file', type=str, default='utils/args.yaml',
                         help="YAML file with data paths & loader params")
     parser.add_argument('--world_size', type=int, default=1)
-    parser.add_argument('--stride', type=int, default=1,
+    parser.add_argument('--stride', type=int, default=3,
                         help="Compute HSIC every `stride` samples")
     parser.add_argument('--device', type=str, default='cuda',
                         help="torch device for encoder & GPU HSIC")
@@ -34,8 +34,8 @@ def main():
     # data loader
     val_loader, _ = prepare_loader(
         args, params,
-        file_txt=params['val_txt'],
-        img_folder=params['val_imgs'],
+        file_txt=params['train_txt'],
+        img_folder=params['train_imgs'],
         starting_epoch=-1,
         num_workers=16
     )
