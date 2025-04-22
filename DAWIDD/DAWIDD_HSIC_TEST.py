@@ -14,33 +14,66 @@ from nets.autoencoder import ConvAutoencoder
 
 # ---- HSIC machinery (unchanged) ----
 
-def centering_torch(K):
-    n = K.size(0)
-    I = torch.eye(n, device=K.device)
-    H = I - torch.ones(n, n, device=K.device) / n
-    return H @ K @ H
+def centering_torch(M: torch.Tensor) -> torch.Tensor:
+    """
+    One‑sided centering: return M @ H
+    where H = I - 1/n · 11^T
+    """
+    n = M.size(0)
+    unit = torch.ones((n, n), device=M.device)
+    I    = torch.eye(n,      device=M.device)
+    H    = I - unit / n
+    return M @ H
 
-def gaussian_grammat_torch(x: torch.Tensor, σ=None):
-    # x: [n, d] on self.device
-    xx = x @ x.t()
-    xnorm = xx.diag().unsqueeze(1) - xx
+
+def gaussian_grammat_torch(x: torch.Tensor, sigma: torch.Tensor = None) -> torch.Tensor:
+    """
+    Exactly like your NumPy version:
+      - Compute pairwise sq. dist.
+      - Median‑heuristic for sigma with epsilon fallback.
+      - Build K = exp( -0.5 * dist / sigma^2 ), in‑place.
+    """
+    # ensure 2D
+    if x.dim() == 1:
+        x = x.view(-1, 1)
+
+    # xxT and squared‐distances
+    xxT   = x @ x.t()                           # [n,n]
+    xnorm = torch.diag(xxT).unsqueeze(1) - xxT
     xnorm = xnorm + xnorm.t()
-    if σ is None:
-        nz = xnorm[xnorm > 0]
-        σ = (0.5 * nz.median()).sqrt() if nz.numel() else 1.0
-    return torch.exp(-0.5 * xnorm / (σ**2))
+
+    # median heuristic
+    if sigma is None:
+        # non‑zero entries
+        nz = xnorm[xnorm != 0]
+        if nz.numel() > 0:
+            mdist = nz.median()
+            sigma = (0.5 * mdist).sqrt()
+        else:
+            sigma = torch.tensor(1.0, device=x.device)
+
+    # epsilon fix if sigma==0
+    # 7/3 - 4/3 - 1 is machine eps in double precision
+    if sigma.item() == 0:
+        eps = 7./3 - 4./3 - 1
+        sigma = sigma + eps
+
+    # build kernel matrix in‑place
+    K = -0.5 * xnorm / (sigma * sigma)
+    return K.exp_()
+
 
 def HSIC_torch(x: torch.Tensor, y: torch.Tensor) -> float:
     """
-    Compute HSIC between x ([n,d]) and y ([n,1]) *entirely on torch*.
-    Returns a Python float.
+    Match your NumPy HSIC: trace( centering(Kx) @ centering(Ky) ) / n^2
     """
     Kx = gaussian_grammat_torch(x)
     Ky = gaussian_grammat_torch(y)
     Cx = centering_torch(Kx)
     Cy = centering_torch(Ky)
-    hsic_val = (Cx @ Cy).trace() / (x.size(0) ** 2)
-    return hsic_val.item()
+    n  = x.size(0)
+    # returns a Python float
+    return (Cx @ Cy).trace().item() / (n * n)
 
 # ---- PyTorch DAWIDD_HSIC ----
 
