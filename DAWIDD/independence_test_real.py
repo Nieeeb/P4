@@ -56,10 +56,7 @@ def main():
             disable_drift_reset=True
         )
         for name, w in {
-            'daily':    1 * sr,
-            'weekly':   3 * sr,    # e.g. 3 days → smaller than full week
-            'monthly': 10 * sr,    # ~10 days
-        }.items()
+            'daily':    1 * sr}.items()
     }
     # also set stride on each detector
     for det in detectors.values():
