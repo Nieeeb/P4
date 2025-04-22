@@ -25,7 +25,7 @@ def main():
     print(f"Local rank: {args.local_rank}, World size: {args.world_size}")
 
     # reproducibility
-    util.setup_seed(0)
+    util.setup_seed()
 
     # load config
     with open(args.args_file) as f:
