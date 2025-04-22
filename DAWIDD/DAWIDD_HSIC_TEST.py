@@ -14,30 +14,30 @@ from nets.autoencoder import ConvAutoencoder
 
 # ---- HSIC machinery (unchanged) ----
 
-def centering(M: np.ndarray) -> np.ndarray:
-    n = M.shape[0]
-    H = np.eye(n) - np.ones((n, n)) / n
-    return H @ M @ H
+def centering_torch(K):
+    n = K.size(0)
+    I = torch.eye(n, device=K.device)
+    H = I - torch.ones(n, n, device=K.device) / n
+    return H @ K @ H
 
-def gaussian_grammat(x: np.ndarray, sigma: float = None) -> np.ndarray:
-    if x.ndim == 1:
-        x = x.reshape(-1, 1)
-    xx = x @ x.T
-    xnorm = np.diag(xx) - xx + (np.diag(xx) - xx).T
-    if sigma is None:
-        nonzero = xnorm[xnorm != 0]
-        sigma = np.sqrt(0.5 * np.median(nonzero)) if len(nonzero) > 0 else 1.0
-    sigma = sigma or np.finfo(float).eps
-    return np.exp(-0.5 * xnorm / (sigma**2))
+def gaussian_grammat_torch(x: torch.Tensor, σ=None):
+    # x: [n, d] on self.device
+    xx = x @ x.t()
+    xnorm = xx.diag().unsqueeze(1) - xx
+    xnorm = xnorm + xnorm.t()
+    if σ is None:
+        nz = xnorm[xnorm > 0]
+        σ = (0.5 * nz.median()).sqrt() if nz.numel() else 1.0
+    return torch.exp(-0.5 * xnorm / (σ**2))
 
 def HSIC(x: np.ndarray, y: np.ndarray) -> float:
-    Kx = gaussian_grammat(x)
-    Ky = gaussian_grammat(y)
-    return np.trace(centering(Kx) @ centering(Ky)) / (x.shape[0]**2)
+    Kx = gaussian_grammat_torch(x)
+    Ky = gaussian_grammat_torch(y)
+    return np.trace(centering_torch(Kx) @ centering_torch(Ky)) / (x.shape[0]**2)
 
 # ---- PyTorch DAWIDD_HSIC ----
 
-#/runs/ae_complex_full_1/100
+
 
 
 class DAWIDD_HSIC:
@@ -51,7 +51,7 @@ class DAWIDD_HSIC:
                  max_window_size: int = 90,
                  min_window_size: int = 70,
                  hsic_threshold: float = 1e-3,
-                 disable_drift_reset: bool = True):
+                 disable_drift_reset: bool = False):
         """
         disable_drift_reset=True will skip the shrink/reset logic and only record HSIC values
         """
@@ -84,24 +84,21 @@ class DAWIDD_HSIC:
         t = (t - t.mean()) / t.std()
         return HSIC(Z, t.reshape(-1, 1))
 
-    def add_batch(self, z: np.ndarray):
-        """Add one latent code and record HSIC value."""
-        self.Z.append(z)
-        self.n_items += 1
+    def add_batch(self, Z_batch: np.ndarray):
+        for z in Z_batch:
+            self._append_and_maybe_test(z)
 
-        # enforce max window
+    def _append_and_maybe_test(self, z):
+        self.Z.append(z); self.n_items += 1
         if self.n_items > self.max_window_size:
-            self.Z.pop(0)
-            self.n_items -= 1
+            self.Z.pop(0); self.n_items -= 1
 
-        # compute HSIC if we have enough samples; else zero
-        if self.n_items >= self.min_window_size:
-            hsic_val = self._test_for_independence()
+        if self.n_items >= self.min_window_size and (self.n_items % self.stride == 0):
+            hsic = self._test_for_independence()
         else:
-            hsic_val = 0.0
+            hsic = 0.0
 
-        # record HSIC every step
-        self.hsic_history.append(hsic_val)
+        self.hsic_history.append(hsic)
 
         # optionally skip drift reset logic
         if not self.disable_drift_reset:

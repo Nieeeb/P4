@@ -1,71 +1,94 @@
-from DAWIDD_HSIC_TEST import DAWIDD_HSIC
-from utils.dataloader import prepare_loader
 import argparse
 import os
-from utils import util
 import yaml
 import pandas as pd
+import torch
 import tqdm
 
+from DAWIDD_HSIC_TEST import DAWIDD_HSIC
+from utils.dataloader import prepare_loader
+from utils import util
 
-#Loading args from CLI
-parser = argparse.ArgumentParser()
-parser.add_argument('--args_file', default='utils/args.yaml', type=str)
-parser.add_argument('--world_size', default=1, type=int)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--args_file', type=str, default='utils/args.yaml',
+                        help="YAML file with data paths & loader params")
+    parser.add_argument('--world_size', type=int, default=1)
+    parser.add_argument('--stride', type=int, default=50,
+                        help="Compute HSIC every `stride` samples")
+    parser.add_argument('--device', type=str, default='cuda',
+                        help="torch device for encoder & GPU HSIC")
+    args = parser.parse_args()
 
-args = parser.parse_args()
+    # DDP boilerplate (if used)
+    args.local_rank = int(os.getenv('LOCAL_RANK', 0))
+    print(f"Local rank: {args.local_rank}, World size: {args.world_size}")
 
-# args for DDP
-args.local_rank = int(os.getenv('LOCAL_RANK', 0))
-print(f"Local rank: {args.local_rank}")
-print(f"World size: {args.world_size}")
+    # reproducibility
+    util.setup_seed(0)
 
-# Setting random seed for reproducability
-# Seed is 0
-util.setup_seed()
+    # load config
+    with open(args.args_file) as f:
+        params = yaml.safe_load(f)
 
-#Loading config
-with open(args.args_file) as cf_file:
-    params = yaml.safe_load( cf_file.read())
+    # data loader
+    val_loader, _ = prepare_loader(
+        args, params,
+        file_txt=params['val_txt'],
+        img_folder=params['val_imgs'],
+        starting_epoch=-1,
+        num_workers=16
+    )
 
+    # checkpoint path
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
 
-sampling_rate_per_day = 3985
+    # sampling rate
+    sr = 3985 # average samples pr day
 
-samples_all_time = 749195
-ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-detectors = {
-    'daily': DAWIDD_HSIC(ckpt, device='cuda', max_window_size=1*sampling_rate_per_day,
-                         min_window_size=int(0.8*1*sampling_rate_per_day), disable_drift_reset=True),
-    'weekly': DAWIDD_HSIC(ckpt, device='cuda', max_window_size=7*sampling_rate_per_day,
-                          min_window_size=int(0.8*7*sampling_rate_per_day), disable_drift_reset=True),
-    'monthly': DAWIDD_HSIC(ckpt, device='cuda', max_window_size=30*sampling_rate_per_day,
-                           min_window_size=int(0.8*30*sampling_rate_per_day), disable_drift_reset=True),
-    'all_time': DAWIDD_HSIC(ckpt, device='cuda', max_window_size=1*samples_all_time,
-                             min_window_size=int(0.8*samples_all_time), disable_drift_reset=True)
-}
+    # build detectors with stride and reasonable windows
+    detectors = {
+        name: DAWIDD_HSIC(
+            ckpt_path=ckpt,
+            device=args.device,
+            max_window_size=w,
+            min_window_size=int(0.8 * w),
+            disable_drift_reset=True
+        )
+        for name, w in {
+            'daily':    1 * sr,
+            'weekly':   3 * sr,    # e.g. 3 days → smaller than full week
+            'monthly': 10 * sr,    # ~10 days
+        }.items()
+    }
+    # also set stride on each detector
+    for det in detectors.values():
+        det.stride = args.stride
 
-starting_epoch = -1
+    # grab encoder once
+    # all detectors share the same encoder
+    encoder = next(iter(detectors.values())).encoder
 
-validation_loader, validation_sampler = prepare_loader(args, params,
-                            file_txt=params.get('val_txt'),
-                            img_folder=params.get('val_imgs'),
-                            starting_epoch=starting_epoch,
-                            num_workers=16
-                            )
+    # processing loop
+    total = len(val_loader.dataset)
+    print(f"Processing {total} samples with stride={args.stride}…")
+    for images, *_ in tqdm.tqdm(val_loader, total=len(val_loader), desc="Batches"):
+        # images: [B, C, H, W]
+        images = images.to(args.device).float()
+        with torch.no_grad():
+            z_batch = encoder(images).view(len(images), -1).cpu().numpy()
 
+        # feed each latent to every detector
+        for z in z_batch:
+            for det in detectors.values():
+                det.add_batch(z)
 
+    # write out CSVs
+    for name, det in detectors.items():
+        df = pd.DataFrame({'hsic_val': det.hsic_history})
+        out_file = f"{name}_hsic_values.csv"
+        df.to_csv(out_file, index_label='sample_index')
+        print(f"Wrote {out_file} ({len(df)} samples)")
 
-idx = 0
-for batch in tqdm.tqdm(validation_loader, desc="Validation batches"):
-    images = batch[0]
-    for img in images:
-        for det in detectors.values():
-            det.set_input(img)
-        idx += 1
-
-# ---- Write CSV files ----
-for name, det in detectors.items():
-    df = pd.DataFrame({'hsic_val': det.hsic_history})
-    out_fname = f"{name}_hsic_values.csv"
-    df.to_csv(out_fname, index_label='sample_index')
-    print(f"Wrote {out_fname} with {len(det.hsic_history)} entries")
+if __name__ == '__main__':
+    main()
