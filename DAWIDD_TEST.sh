@@ -5,7 +5,6 @@
 #SBATCH --signal=B:SIGTERM@60
 #SBATCH --cpus-per-task=15
 #SBATCH --mem=128G
-#SBATCH --nodelist=ailab-l4-08 --wrap="hostname"
 
 #####################################################################################
 
