@@ -36,4 +36,4 @@ echo "Error file: ${errfile}"
 #######################################################################################
 
 # Use srun to dynamically specify the output and error files
-srun --output="${outfile}" --error="${errfile}" singularity exec --nv /ceph/project/DAKI4-thermal-2025/container.sif python3 DAWIDD/independence_test_real.py --args_file=$args_file>
+srun --output="${outfile}" --error="${errfile}" singularity exec --nv /ceph/project/DAKI4-thermal-2025/container.sif python3 DAWIDD/independence_test_real.py --args_file=$args_file
