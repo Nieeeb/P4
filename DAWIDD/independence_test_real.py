@@ -52,15 +52,11 @@ def main():
             ckpt_path=ckpt,
             device=args.device,
             max_window_size=w,
-            min_window_size=int(0.8 * w),
-            disable_drift_reset=True
+            min_window_size=int(0.8 * w)
         )
         for name, w in {
             'daily':    1 * sr}.items()
     }
-    # also set stride on each detector
-    for det in detectors.values():
-        det.stride = args.stride
 
     # grab encoder once
     # all detectors share the same encoder

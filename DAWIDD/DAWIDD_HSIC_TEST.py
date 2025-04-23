@@ -91,10 +91,17 @@ class DAWIDD_HSIC:
                  max_window_size: int = 90,
                  min_window_size: int = 70,
                  hsic_threshold: float = 1e-3,
-                 disable_drift_reset: bool = False):
+                 disable_drift_reset: bool = False,
+                 stride: int = 3):
         """
         disable_drift_reset=True will skip the shrink/reset logic and only record HSIC values
         """
+
+        self.total_seen = 0
+
+        self.stride = stride
+
+
         self.device = torch.device(device)
         # build and load your AE
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
@@ -137,11 +144,13 @@ class DAWIDD_HSIC:
             self._append_and_maybe_test(z)
 
     def _append_and_maybe_test(self, z):
-        self.Z.append(z); self.n_items += 1
-        if self.n_items > self.max_window_size:
-            self.Z.pop(0); self.n_items -= 1
+        self.total_seen += 1
+        self.Z.append(z)
+        if len(self.Z) > self.max_window_size:
+            self.Z.pop(0)
 
-        if self.n_items >= self.min_window_size and (self.n_items % self.stride == 0):
+        if len(self.Z) >= self.min_window_size \
+            and (self.total_seen % self.stride == 0):
             hsic = self._test_for_independence()
         else:
             hsic = 0.0
@@ -149,13 +158,11 @@ class DAWIDD_HSIC:
         self.hsic_history.append(hsic)
 
         # optionally skip drift reset logic
-        if not self.disable_drift_reset:
-            if hsic_val >= self.hsic_threshold:
-                # shrink window until below threshold or at min size
-                while hsic_val >= self.hsic_threshold and self.n_items > self.min_n_items:
+        if not self.disable_drift_reset and hsic >= self.hsic_threshold:
+                    # keep shrinking until we’re below threshold or at min size
+                while hsic >= self.hsic_threshold and len(self.Z) > self.min_n_items:
                     self.Z.pop(0)
-                    self.n_items -= 1
-                    hsic_val = self._test_for_independence()
+                    hsic = self._test_for_independence()
 
     def set_input(self, img) -> None:
         """Process one image/sample and update HSIC history."""
