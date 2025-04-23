@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=train_yolo
+#SBATCH --job-name=DAWIDD_TEST
 #SBATCH --time=11:57:00
 #SBATCH --signal=B:SIGTERM@60
 #SBATCH --cpus-per-task=15
