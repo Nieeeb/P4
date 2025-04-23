@@ -92,7 +92,7 @@ class DAWIDD_HSIC:
                  min_window_size: int = 70,
                  hsic_threshold: float = 1e-3,
                  disable_drift_reset: bool = False,
-                 stride: int = 3):
+                 stride: int = 10):
         """
         disable_drift_reset=True will skip the shrink/reset logic and only record HSIC values
         """
@@ -103,7 +103,6 @@ class DAWIDD_HSIC:
 
 
         self.device = torch.device(device)
-        # build and load your AE
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         raw = ckpt.get('model', ckpt)
@@ -125,24 +124,24 @@ class DAWIDD_HSIC:
         self.n_items = 0
         self.hsic_history = []   # record all HSIC values
 
+
     def _test_for_independence(self) -> float:
-        # 1) stack NumPy history and normalize time vector
         n = len(self.Z)
-        Z_np = np.vstack(self.Z)                            # [n, d]
-        t_np = np.arange(n, dtype=float)         # [n]
+        Z_np = np.vstack(self.Z)                             # [n, d]
+        t_np = np.arange(n, dtype=float)                     # [n]
         t_np = (t_np - t_np.mean()) / t_np.std()             # normalized
 
-        # 2) convert to torch.Tensor on self.device
+        # convert to torch.Tensor on self.device
         Z = torch.from_numpy(Z_np).to(self.device).float()   # [n, d]
         t = torch.from_numpy(t_np).to(self.device).float()   # [n]
         t = t.unsqueeze(1)                                   # [n,1]
-
-        # 3) call standalone HSIC function
         return HSIC_torch(Z, t)
+
 
     def add_batch(self, Z_batch: np.ndarray):
         for z in Z_batch:
             self._append_and_maybe_test(z)
+
 
     def _append_and_maybe_test(self, z):
         self.total_seen += 1
@@ -158,12 +157,12 @@ class DAWIDD_HSIC:
 
         self.hsic_history.append(hsic)
 
-        # optionally skip drift reset logic
         if not self.disable_drift_reset and hsic >= self.hsic_threshold:
                     # keep shrinking until we’re below threshold or at min size
                 while hsic >= self.hsic_threshold and len(self.Z) > self.min_n_items:
                     self.Z.pop(0)
                     hsic = self._test_for_independence()
+
 
     def set_input(self, img) -> None:
         """Process one image/sample and update HSIC history."""
