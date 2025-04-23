@@ -127,8 +127,9 @@ class DAWIDD_HSIC:
 
     def _test_for_independence(self) -> float:
         # 1) stack NumPy history and normalize time vector
+        n = len(self.Z)
         Z_np = np.vstack(self.Z)                            # [n, d]
-        t_np = np.arange(self.n_items, dtype=float)         # [n]
+        t_np = np.arange(n, dtype=float)         # [n]
         t_np = (t_np - t_np.mean()) / t_np.std()             # normalized
 
         # 2) convert to torch.Tensor on self.device
