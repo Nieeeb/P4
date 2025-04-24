@@ -122,7 +122,7 @@ def HSIC_batch(Xb, Yb):
     return traces.float() / (Xb.size(1)**2)
 
 
-def hsic_pvalue_batch(x, y, B=100, batch_size=100, device='cuda'):
+def hsic_pvalue_batch(x, y, B=100, batch_size=50, device='cuda'):
     T_obs = HSIC_torch(x, y)
     n, d = x.size(0), x.size(1)
     null_stats = []
