@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 import tqdm
 
-from DAWIDD_HSIC_TEST import DAWIDD_HSIC
+from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 from utils import util
 

@@ -126,12 +126,12 @@ class DAWIDD_HSIC:
 
 
     def _test_for_independence_with_p(self, B=500) -> float:
+        
+        
         n = len(self.Z)
         Z_np = np.vstack(self.Z)                             # [n, d]
         t_np = np.arange(n, dtype=float)                     # [n]
         t_np = (t_np - t_np.mean()) / t_np.std()             # normalized
-
-        # convert to torch.Tensor on self.device
         Z = torch.from_numpy(Z_np).to(self.device).float()   # [n, d]
         t = torch.from_numpy(t_np).to(self.device).float()   # [n]
         t = t.unsqueeze(1)      
