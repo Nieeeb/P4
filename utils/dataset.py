@@ -128,6 +128,7 @@ class Dataset(data.Dataset):
         # r = self.input_size / max(h, w)
         # if r != 1:
         #     image = image.resize(size=(int(w * r), int(h * r)))
+        print(self.filenames[i])
         return image, (h, w)
 
     def load_mosaic(self, index, params):
