@@ -77,8 +77,13 @@ def main():
 
     # write out CSVs
     for name, det in detectors.items():
-        df = pd.DataFrame({'hsic_val': det.hsic_history})
-        out_file = f"{name}_hsic_values.csv"
+        # unpack the history into two lists
+        hsic_vals, p_vals = zip(*det.hsic_history)  # det.hsic_history is now List[Tuple[float, float]]
+        df = pd.DataFrame({
+            'hsic_val': hsic_vals,
+            'p_value': p_vals
+        })
+        out_file = f"{name}_hsic_pvalues.csv"
         df.to_csv(out_file, index_label='sample_index')
         print(f"Wrote {out_file} ({len(df)} samples)")
 

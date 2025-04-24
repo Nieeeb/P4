@@ -125,7 +125,7 @@ class DAWIDD_HSIC:
         self.hsic_history = []   # record all HSIC values
 
 
-    def _test_for_independence(self) -> float:
+    def _test_for_independence_with_p(self, B=500) -> float:
         n = len(self.Z)
         Z_np = np.vstack(self.Z)                             # [n, d]
         t_np = np.arange(n, dtype=float)                     # [n]
@@ -134,8 +134,17 @@ class DAWIDD_HSIC:
         # convert to torch.Tensor on self.device
         Z = torch.from_numpy(Z_np).to(self.device).float()   # [n, d]
         t = torch.from_numpy(t_np).to(self.device).float()   # [n]
-        t = t.unsqueeze(1)                                   # [n,1]
-        return HSIC_torch(Z, t)
+        t = t.unsqueeze(1)      
+                                    
+        T_obs = HSIC_torch(Z, t)
+        null = []
+        for _ in range(B):
+            perm = torch.randperm(n, device=self.device)
+            T_null = HSIC_torch(Z, t[perm])
+            null.append(T_null)
+        null = torch.tensor(null)
+        p_val = (null.ge(T_obs).sum().item() + 1) / (B + 1)
+        return T_obs, p_val
 
 
     def add_batch(self, Z_batch: np.ndarray):
@@ -151,17 +160,12 @@ class DAWIDD_HSIC:
 
         if len(self.Z) >= self.min_window_size \
             and (self.total_seen % self.stride == 0):
-            hsic = self._test_for_independence()
+            T, p = self._test_for_independence_with_p(B=200)
         else:
-            hsic = 0.0
+            T, p = 0.0, 1.0
+        self.hsic_history.append((T, p))
 
-        self.hsic_history.append(hsic)
 
-        if not self.disable_drift_reset and hsic >= self.hsic_threshold:
-                    # keep shrinking until we’re below threshold or at min size
-                while hsic >= self.hsic_threshold and len(self.Z) > self.min_n_items:
-                    self.Z.pop(0)
-                    hsic = self._test_for_independence()
 
 
     def set_input(self, img) -> None:

@@ -5,6 +5,7 @@ Data/images
 Data/labels
 Data/Labels
 runs/
+drift_analysis/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
