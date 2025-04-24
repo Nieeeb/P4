@@ -116,8 +116,10 @@ def HSIC_batch(Xb, Yb):
     # Xb: [B, n, d], Yb: [B, n, 1]
     Kx = centering_torch(gaussian_grammat_torch(Xb))
     Ky = centering_torch(gaussian_grammat_torch(Yb))
-    # trace per batch: returns [B]
-    return torch.einsum('bij,bij->b', (Kx @ Ky)).float() / (Xb.size(1)**2)
+    M = Kx @ Ky            # [B, n, n]
+    # sum over the diagonal for each batch
+    traces = torch.einsum('bii->b', M)      # or: M.diagonal(dim1=1, dim2=2).sum(1)
+    return traces.float() / (Xb.size(1)**2)
 
 
 def hsic_pvalue_batch(x, y, B=1000, batch_size=100, device='cuda'):
