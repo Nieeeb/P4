@@ -44,7 +44,7 @@ def main():
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
+    #ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
