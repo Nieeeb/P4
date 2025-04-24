@@ -122,29 +122,6 @@ def HSIC_batch(Xb, Yb):
     return traces.float() / (Xb.size(1)**2)
 
 
-def hsic_pvalue_batch(x, y, B=100, batch_size=50, device='cuda'):
-    T_obs = HSIC_torch(x, y)
-    n, d = x.size(0), x.size(1)
-    null_stats = []
-
-    # prepare x once, [1,n,d] → [batch_size,n,d]
-    Xb = x.view(1, n, d).expand(batch_size, n, d)
-
-    for start in range(0, B, batch_size):
-        b = min(batch_size, B - start)
-        # draw b independent perms
-        perms = torch.stack([torch.randperm(n, device=device) for _ in range(b)])
-
-        Yb = y[perms]
-        # pad to full batch_size if needed
-        Xb_pad = Xb[:b]
-        Knull = HSIC_batch(Xb_pad, Yb)
-        null_stats.append(Knull.cpu())
-
-    null = torch.cat(null_stats)
-    p    = (null.ge(T_obs).sum().item() + 1) / (len(null) + 1)
-    return T_obs, p
-
 # ---- PyTorch DAWIDD_HSIC ----
 
 
@@ -165,7 +142,10 @@ class DAWIDD_HSIC:
                  min_window_size: int = 70,
                  hsic_threshold: float = 1e-3,
                  disable_drift_reset: bool = False,
-                 stride: int = 10):
+                 stride: int = 10,
+                 perm_reps: int = 200,
+                 perm_batch_size: int = 100,
+                 perm_devices: list = None):
         """
         disable_drift_reset=True will skip the shrink/reset logic and only record HSIC values
         """
@@ -198,6 +178,52 @@ class DAWIDD_HSIC:
         self.hsic_history = []   # record all HSIC values
 
 
+        self.perm_reps        = perm_reps
+        self.perm_batch_size  = perm_batch_size
+        # default: use every cuda device except the one holding self.device
+        if perm_devices is None:
+            all_ids = list(range(torch.cuda.device_count()))
+            main_id = self.device.index if self.device.type=='cuda' else None
+            self.perm_devices = [i for i in all_ids if i!=main_id]
+        else:
+            self.perm_devices = perm_devices
+        if not self.perm_devices:
+            # fallback to main device
+            self.perm_devices = [ self.device.index or 0 ]
+
+
+    def _hsic_pvalue_batch(self, x, y):
+        T_obs = HSIC_torch(x, y)
+        n, d = x.size(0), x.size(1)
+        null_stats = []
+
+        # prepare the “clean” Xb on CPU once
+        Xb_cpu = x.view(1,n,d).cpu()  # [1,n,d] on CPU
+
+        for chunk_idx, start in enumerate(range(0, self.perm_reps, self.perm_batch_size)):
+            b = min(self.perm_batch_size, self.perm_reps - start)
+            # pick a GPU
+            dev_id = self.perm_devices[chunk_idx % len(self.perm_devices)]
+            perm_dev = torch.device(f'cuda:{dev_id}')
+
+            # move chunked Xb and generate perms on that GPU
+            Xb = Xb_cpu[:b].to(perm_dev)                # [b,n,d] on gpu:dev_id
+            perms = torch.stack([torch.randperm(n, device=perm_dev)
+                                for _ in range(b)])
+            Yb = y[perms].to(perm_dev)                  # [b,n,1]
+
+            Knull = HSIC_batch(Xb, Yb)                  # runs on gpu:dev_id
+            null_stats.append(Knull.cpu())              # move back to CPU
+
+            # free gpu:dev_id
+            del Xb, Yb, Knull, perms
+            torch.cuda.empty_cache()
+
+        null = torch.cat(null_stats)                   # on CPU
+        p    = (null.ge(T_obs).sum().item() + 1) / (len(null) + 1)
+        return T_obs, p
+
+
     def _test_for_independence_perm_fast(self, B=1000, batch_size=100):
         # stack and normalize
         n = len(self.Z)
@@ -211,7 +237,7 @@ class DAWIDD_HSIC:
         t = t.unsqueeze(1)                                   # [n, 1]
 
     # batch‐permutation p‐value returns exactly 2 values
-        T_obs, p_val = hsic_pvalue_batch(
+        T_obs, p_val = self._hsic_pvalue_batch(
             Z, t,
             B=B,
             batch_size=batch_size,

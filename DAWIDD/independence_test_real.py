@@ -48,13 +48,19 @@ def main():
     # sampling rate
     sr = 3985 # average samples pr day
 
+    perm_gpus = list(range(1, torch.cuda.device_count()))
+
     # build detectors with stride and reasonable windows
     detectors = {
         name: DAWIDD_HSIC(
             ckpt_path=ckpt,
             device=args.device,
             max_window_size=w,
-            min_window_size=int(0.8 * w)
+            min_window_size=int(0.8 * w),
+            stride= 10,
+            perm_reps=1000,               
+            perm_batch_size=125,
+            perm_devices=perm_gpus,
         )
         for name, w in {
             'daily':    1 * sr}.items()

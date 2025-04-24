@@ -10,7 +10,7 @@
 
 # tweak this to fit your needs
 max_restarts=1
-num_gpus=1
+num_gpus=8
 args_file="utils/args.yaml"
 
 # tweak settings to match set parameters
