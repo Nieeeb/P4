@@ -237,12 +237,7 @@ class DAWIDD_HSIC:
         t = t.unsqueeze(1)                                   # [n, 1]
 
     # batch‐permutation p‐value returns exactly 2 values
-        T_obs, p_val = self._hsic_pvalue_batch(
-            Z, t,
-            B=B,
-            batch_size=batch_size,
-            device=self.device
-        )
+        T_obs, p_val = self._hsic_pvalue_batch(Z, t)
         return T_obs, p_val
 
 
