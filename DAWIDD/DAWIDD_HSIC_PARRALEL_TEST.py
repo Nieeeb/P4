@@ -199,6 +199,7 @@ class DAWIDD_HSIC:
 
         # prepare the “clean” Xb on CPU once
         Xb_cpu = x.view(1,n,d).cpu()  # [1,n,d] on CPU
+        y_cpu = y.cpu()
 
         for chunk_idx, start in enumerate(range(0, self.perm_reps, self.perm_batch_size)):
             b = min(self.perm_batch_size, self.perm_reps - start)
@@ -207,10 +208,11 @@ class DAWIDD_HSIC:
             perm_dev = torch.device(f'cuda:{dev_id}')
 
             # move chunked Xb and generate perms on that GPU
-            Xb = Xb_cpu[:b].to(perm_dev)                # [b,n,d] on gpu:dev_id
+            Xb = Xb_cpu[:b].to(perm_dev)    
+            y_chunk = y_cpu.to(perm_dev)            # [b,n,d] on gpu:dev_id
             perms = torch.stack([torch.randperm(n, device=perm_dev)
                                 for _ in range(b)])
-            Yb = y[perms].to(perm_dev)                  # [b,n,1]
+            Yb = y_chunk[perms]                   # [b,n,1]
 
             Knull = HSIC_batch(Xb, Yb)                  # runs on gpu:dev_id
             null_stats.append(Knull.cpu())              # move back to CPU
