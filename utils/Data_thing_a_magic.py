@@ -259,16 +259,42 @@ def write_absolute_jpg_paths(dataloader, output_txt_path):
             abs_path = abs_path.replace('\\', '/')
             f.write(abs_path + "\n")
 
+def write_relative_jpg_paths(dataloader, output_txt_path):
+    """
+    Writes a text file where each line is the relative path to a .jpg file.
+    The paths are written with forward slashes so that the following code:
+        filename.rstrip().split('/')[-1]
+    correctly extracts the filename.
+    
+    Parameters:
+        data_thing (DataThingAMagic): An instance of DataThingAMagic.
+        output_txt_path (str): The path to the output text file.
+    """
+    # Get all jpg files from the data directory that meet the period criteria
+    jpg_files = dataloader.relevantFiles()
+    jpg_files.sort()
+    
+    # Get the absolute path to the data directory
+    dir = dataloader.data_directory
+    
+    with open(output_txt_path, 'w') as f:
+        for file in jpg_files:
+            # Build the absolute path to the jpg file
+            abs_path = os.path.join(dir, file)
+            # Convert backslashes (Windows) to forward slashes
+            abs_path = abs_path.replace('\\', '/')
+            f.write(abs_path + "\n")
 
 
 
 if __name__ == "__main__":
-    dataloader = DataThingAMagic(period_begin="20210201", 
-                                 period_end="20210128", 
+    dataloader = DataThingAMagic(period_begin="20100515", 
+                                 period_end="20300521", 
                                  data_directory="Data/images/valid",
                                  json_directory="/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfrontv2/Valid.json",
                                  total_files=1000000000000,
                                  data_split="test1")
 
 
-    write_absolute_jpg_paths(dataloader, "Data/Febvalid.txt")
+    #write_absolute_jpg_paths(dataloader, "Data/train.txt")
+    write_relative_jpg_paths(dataloader, "Data/valid.txt")

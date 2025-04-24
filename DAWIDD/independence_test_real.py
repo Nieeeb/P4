@@ -37,11 +37,13 @@ def main():
         file_txt=params['val_txt'],
         img_folder=params['val_imgs'],
         starting_epoch=-1,
-        num_workers=16
+        num_workers=16,
+        shuffle = False
     )
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
+    ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
 
     # sampling rate
     sr = 3985 # average samples pr day
