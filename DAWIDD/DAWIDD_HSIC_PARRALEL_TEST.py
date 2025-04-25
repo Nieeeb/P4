@@ -96,7 +96,7 @@ def gaussian_grammat_torch(x: torch.Tensor, sigma: torch.Tensor = None) -> torch
 
 def HSIC_torch(x: torch.Tensor, y: torch.Tensor) -> float:
     # keep x,y in their original dtype (float32), but autocast will cast ops
-    with autocast():                       # <— no args here
+    with torch.inference_mode(), torch.autocast():                       # <— no args here
         Kx = gaussian_grammat_torch(x)
         Ky = gaussian_grammat_torch(y)
         Cx = centering_torch(Kx)
@@ -116,7 +116,7 @@ def HSIC_batch(Xb, Yb):
     Xb: [B, n, d], Yb: [B, n, 1]
     """
     # everything inside here will be FP16 on the GPU
-    with autocast():
+    with torch.inference_mode(), torch.autocast():
         Kx = centering_torch(gaussian_grammat_torch(Xb))
         Ky = centering_torch(gaussian_grammat_torch(Yb))
         M  = Kx @ Ky                   # [B, n, n]
@@ -179,7 +179,6 @@ class DAWIDD_HSIC:
         self.hsic_threshold = hsic_threshold
         self.disable_drift_reset = disable_drift_reset
 
-        # buffers
         self.Z = []              # list of latent codes
         self.n_items = 0
         self.hsic_history = []   # record all HSIC values
@@ -187,6 +186,7 @@ class DAWIDD_HSIC:
 
         self.perm_reps        = perm_reps
         self.perm_batch_size  = perm_batch_size
+
         # default: use every cuda device except the one holding self.device
         if perm_devices is None:
             all_ids = list(range(torch.cuda.device_count()))
@@ -226,26 +226,23 @@ class DAWIDD_HSIC:
 
             # free gpu:dev_id
             del Xb, Yb, Knull, perms
-            torch.cuda.empty_cache()
+            
 
         null = torch.cat(null_stats)                   # on CPU
         p    = (null.ge(T_obs).sum().item() + 1) / (len(null) + 1)
         return T_obs, p
 
 
-    def _test_for_independence_perm_fast(self, B=1000, batch_size=100):
-        # stack and normalize
+    def _test_for_independence_perm_fast(self, B: int, batch_size: int):
         n = len(self.Z)
         Z_np = np.vstack(self.Z)                  # [n, d]
         t_np = np.arange(n, dtype=float)
         t_np = (t_np - t_np.mean()) / t_np.std()
 
-        # to tensors once
         Z = torch.from_numpy(Z_np).to(self.device).float()   # [n, d]
         t = torch.from_numpy(t_np).to(self.device).float()   # [n]
         t = t.unsqueeze(1)                                   # [n, 1]
 
-    # batch‐permutation p‐value returns exactly 2 values
         T_obs, p_val = self._hsic_pvalue_batch(Z, t)
         return T_obs, p_val
 
