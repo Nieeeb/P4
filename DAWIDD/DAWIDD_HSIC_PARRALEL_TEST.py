@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 from torch import nn
 from torch.cuda.amp import autocast
@@ -14,123 +13,131 @@ from nets.autoencoder import ConvAutoencoder
 
 # ---- HSIC machinery (unchanged) ----
 
-def centering_torch(M: torch.Tensor) -> torch.Tensor:
+import torch
+from typing import Tuple, Union
+
+_FINFO = {
+    torch.float32: torch.finfo(torch.float32).eps,
+    torch.float16: torch.finfo(torch.float16).eps,
+    torch.float64: torch.finfo(torch.float64).eps,
+}
+
+def _median_heuristic(dist2: torch.Tensor) -> torch.Tensor:
     """
-    Batched one-sided centering: return M @ H
-    where H = I - 1/n · 11^T.
-    Supports both M.shape = [n, n] and [B, n, n].
+    Median heuristic for σ – identical to the NumPy reference:
+
+        ‖x_i-x_j‖² = 2 σ²  ⇒  σ = sqrt( 0.5 * median(dist²_ij) )
     """
-    # Lift 2D → 3D
-    if M.dim() == 2:
-        M = M.unsqueeze(0)  # [1, n, n]
+    # ignore the diagonal zeros
+    nz = dist2[dist2 != 0]
+    if nz.numel() == 0:
+        return torch.tensor(1.0, device=dist2.device, dtype=dist2.dtype)
+    return (0.5 * nz.median()).sqrt()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+def gaussian_grammat_torch(
+    x: torch.Tensor,
+    sigma: Union[None, torch.Tensor, float] = None
+) -> torch.Tensor:
+    """
+    Gaussian RBF Gram matrix – behaviour matches the reference implementation
+    1:1, but is fully vectorised and GPU friendly.
+        • Accepts x with shape  [n, d]         → returns [n, n]
+                                  or [B, n, d] → returns [B, n, n]
+        • If `sigma` is None  → median heuristic per *batch*
+        • If `sigma` is a scalar tensor / float → same σ for every batch
+        • If `sigma` is a 1-D tensor of length B → σ[b] for batch b
+    """
+    # lift to 3-D so we can treat both cases uniformly
+    if x.ndim == 2:
+        x = x.unsqueeze(0)              # [1, n, d]
         single = True
-    elif M.dim() == 3:
+    elif x.ndim == 3:
         single = False
     else:
-        raise ValueError(f"Expected M to be 2D or 3D, got {M.dim()}D")
+        raise ValueError("x must be 2-D or 3-D")
 
-    B, n, _ = M.shape
-    unit = torch.ones((n, n), device=M.device, dtype=M.dtype)
-    I    = torch.eye(n,      device=M.device, dtype=M.dtype)
-    H    = I - unit / n       # [n, n]
+    B, n, _ = x.shape
+    # ‖x_i-x_j‖²  =  ‖x_i‖² + ‖x_j‖² − 2 x_i·x_j
+    xxT   = x @ x.transpose(1, 2)                       # [B, n, n]
+    diag  = torch.diagonal(xxT, dim1=1, dim2=2)         # [B, n]
+    dist2 = diag.unsqueeze(2) - 2*xxT + diag.unsqueeze(1)  # [B, n, n]
 
-    # batch-matrix multiply: [B, n, n] @ [n, n] → [B, n, n]
-    out = M @ H
-
-    return out[0] if single else out
-
-
-def gaussian_grammat_torch(x: torch.Tensor, sigma: torch.Tensor = None) -> torch.Tensor:
-    """
-    Batched Gaussian RBF kernel:
-      - x.shape = [n, d]   → returns [n, n]
-      - x.shape = [B, n, d] → returns [B, n, n]
-    Median-heuristic for sigma applied per batch if sigma=None.
-    """
-    # Lift 2D → 3D
-    if x.dim() == 2:
-        x = x.unsqueeze(0)  # [1, n, d]
-        single = True
-    elif x.dim() == 3:
-        single = False
-    else:
-        raise ValueError(f"Expected x to be 2D or 3D, got {x.dim()}D")
-
-    B, n, d = x.shape
-    # compute pairwise inner products and squared distances
-    xxT   = x @ x.transpose(1, 2)                           # [B, n, n]
-    diag  = torch.diagonal(xxT, dim1=1, dim2=2).unsqueeze(2)  # [B, n, 1]
-    xnorm = diag - xxT
-    xnorm = xnorm + xnorm.transpose(1, 2)                   # [B, n, n]
-
-    # compute sigma per batch if needed
+    # ── bandwidth σ ──────────────────────────────────────────────────────────
     if sigma is None:
         sigmas = []
         for b in range(B):
-            nz = xnorm[b][xnorm[b] != 0]
-            if nz.numel() > 0:
-                mdist = nz.median()
-                s = (0.5 * mdist).sqrt()
-            else:
-                s = torch.tensor(1.0, device=x.device, dtype=x.dtype)
-            # fallback if zero
-            if s.item() == 0:
-                eps = (7./3 - 4./3 - 1)
-                s = s + eps
+            s = _median_heuristic(dist2[b])
+            # NumPy version adds machine-epsilon if σ == 0
+            s = torch.clamp(s, min=_FINFO[x.dtype])
             sigmas.append(s)
-        sigma = torch.stack(sigmas)  # [B]
+        sigma = torch.stack(sigmas)                     # [B]
     else:
-        sigma = torch.as_tensor(sigma, device=x.device, dtype=x.dtype)
-        if sigma.dim() == 0:
+        sigma = torch.as_tensor(sigma, dtype=x.dtype, device=x.device)
+        if sigma.ndim == 0:                 # scalar
             sigma = sigma.repeat(B)
-        elif sigma.dim() == 1 and sigma.numel() == B:
+        elif sigma.ndim == 1 and sigma.numel() == B:    # one per batch
             pass
         else:
-            raise ValueError(f"Invalid sigma shape {sigma.shape} for batch size {B}")
+            raise ValueError("Bad shape for sigma")
 
-    # build kernel
-    denom = (sigma**2).view(B, 1, 1)                         # [B, 1, 1]
-    K = torch.exp(-0.5 * xnorm / denom)                     # [B, n, n]
+        sigma = torch.clamp(sigma, min=_FINFO[x.dtype]) # make strictly > 0
+
+    # ── Gaussian kernel K_ij = exp(-‖x_i-x_j‖² / 2σ²) ───────────────────────
+    denom = (2.0 * sigma.pow(2)).view(B, 1, 1)          # [B, 1, 1]
+    K = torch.exp(-dist2 / denom)                       # [B, n, n]
 
     return K[0] if single else K
 
+
+def centering_torch(K: torch.Tensor) -> torch.Tensor:
+    """
+    One-sided centering  (identical to NumPy’s  K @ H).
+    Works for [n, n] and [B, n, n].
+    """
+    if K.ndim == 2:
+        K = K.unsqueeze(0)
+        single = True
+    elif K.ndim == 3:
+        single = False
+    else:
+        raise ValueError("K must be 2-D or 3-D")
+
+    B, n, _ = K.shape
+    H = torch.eye(n, device=K.device, dtype=K.dtype) - 1.0 / n
+    Kc = K @ H
+    return Kc[0] if single else Kc
+# ---------- scalar & batched HSIC (GPU, no autograd, float32) -----------------
+
 def HSIC_torch(x: torch.Tensor, y: torch.Tensor) -> float:
-    # keep x,y in their original dtype (float32), but autocast will cast ops
-    with torch.inference_mode(), torch.autocast('cuda'):                       # <— no args here
-        Kx = gaussian_grammat_torch(x)
-        Ky = gaussian_grammat_torch(y)
-        Cx = centering_torch(Kx)
-        Cy = centering_torch(Ky)
-        val = (Cx @ Cy).trace() / (x.size(0)**2)
-    return val.item()
-
-
-
-
-
-
-
-def HSIC_batch(Xb, Yb):
     """
-    Batched HSIC, but now inside AMP so all GPU ops go to float16.
-    Xb: [B, n, d], Yb: [B, n, 1]
+    d = 2 case, NumPy-compatible scalar HSIC.
+    All math stays in float32 on the chosen device (no autocast / FP16),
+    so the value is bit-for-bit identical to the CPU reference as long as the
+    GPU follows IEEE-754 (CUDA does).
     """
-    # everything inside here will be FP16 on the GPU
-    with torch.inference_mode(), torch.autocast('cuda'):
-        Kx = centering_torch(gaussian_grammat_torch(Xb))
-        Ky = centering_torch(gaussian_grammat_torch(Yb))
-        M  = Kx @ Ky                   # [B, n, n]
-        # sum diagonals (still FP16)
-        traces = torch.einsum('bii->b', M)
-
-    # convert back to float32 for stability of downstream CPU ops
-    return traces.float() / (Xb.size(1)**2)
+    with torch.inference_mode():
+        Kx = centering_torch(gaussian_grammat_torch(x))
+        Ky = centering_torch(gaussian_grammat_torch(y))
+        n  = x.size(0)
+        hsic = (Kx @ Ky).trace() / (n * n)
+    return hsic.item()
 
 
-# ---- PyTorch DAWIDD_HSIC ----
-
-
-
+def HSIC_batch(Xb: torch.Tensor, Yb: torch.Tensor) -> torch.Tensor:
+    """
+    Same estimator but for a *batch* of permutations:
+        Xb: [B, n, d]   (same X repeated B times)
+        Yb: [B, n, 1]   (different permutations of y)
+    Returns: [B]  (float32, on same device as the inputs)
+    """
+    with torch.inference_mode():
+        Kx = centering_torch(gaussian_grammat_torch(Xb))    # [B, n, n]
+        Ky = centering_torch(gaussian_grammat_torch(Yb))    # [B, n, n]
+        n  = Xb.size(1)
+        traces = torch.einsum('bii->b', Kx @ Ky) / (n * n)   # [B]
+    return traces
 
 
 
