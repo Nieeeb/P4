@@ -95,16 +95,16 @@ def gaussian_grammat_torch(x: torch.Tensor, sigma: torch.Tensor = None) -> torch
     return K[0] if single else K
 
 def HSIC_torch(x: torch.Tensor, y: torch.Tensor) -> float:
-    """
-    Match your NumPy HSIC: trace( centering(Kx) @ centering(Ky) ) / n^2
-    """
-    Kx = gaussian_grammat_torch(x)
-    Ky = gaussian_grammat_torch(y)
-    Cx = centering_torch(Kx)
-    Cy = centering_torch(Ky)
-    n  = x.size(0)
-    # returns a Python float
-    return (Cx @ Cy).trace().item() / (n * n)
+    # keep x,y in their original dtype (float32), but autocast will cast ops
+    with autocast(device_type='cuda', dtype=torch.float16):
+        Kx = gaussian_grammat_torch(x)
+        Ky = gaussian_grammat_torch(y)
+        Cx = centering_torch(Kx)
+        Cy = centering_torch(Ky)
+        n  = x.size(0)
+        val = (Cx @ Cy).trace() / (n * n)
+    # val is a torch.Tensor in float16; .item() returns a Python float
+    return val.item()
 
 
 
@@ -113,12 +113,19 @@ def HSIC_torch(x: torch.Tensor, y: torch.Tensor) -> float:
 
 
 def HSIC_batch(Xb, Yb):
-    # Xb: [B, n, d], Yb: [B, n, 1]
-    Kx = centering_torch(gaussian_grammat_torch(Xb))
-    Ky = centering_torch(gaussian_grammat_torch(Yb))
-    M = Kx @ Ky            # [B, n, n]
-    # sum over the diagonal for each batch
-    traces = torch.einsum('bii->b', M)      # or: M.diagonal(dim1=1, dim2=2).sum(1)
+    """
+    Batched HSIC, but now inside AMP so all GPU ops go to float16.
+    Xb: [B, n, d], Yb: [B, n, 1]
+    """
+    # everything inside here will be FP16 on the GPU
+    with autocast(device_type='cuda', dtype=torch.float16):
+        Kx = centering_torch(gaussian_grammat_torch(Xb))
+        Ky = centering_torch(gaussian_grammat_torch(Yb))
+        M  = Kx @ Ky                   # [B, n, n]
+        # sum diagonals (still FP16)
+        traces = torch.einsum('bii->b', M)
+
+    # convert back to float32 for stability of downstream CPU ops
     return traces.float() / (Xb.size(1)**2)
 
 
