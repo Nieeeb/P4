@@ -3,7 +3,9 @@ import os
 import yaml
 import pandas as pd
 import torch
-import tqdm
+from tqdm import tqdm
+import numpy as np
+import ast
 
 from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
@@ -31,7 +33,19 @@ def main():
     # load config
     with open(args.args_file) as f:
         params = yaml.safe_load(f)
+        
+    write_inference(args, params)
+    #add_dates()
+    
+def add_dates():
+    df = pd.read_csv('DAWIDD/encodings_train.csv', index_col=0)
+    df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
+    
+    for index, row in tqdm(df.iterrows(), desc='Rows', total=len(df)):
+        print(type(row['output']))
+        print(row['output'])
 
+def write_inference(args, params):
     # data loader
     loader, _ = prepare_loader(
         args, params,
@@ -56,7 +70,7 @@ def main():
     
     encodings = []
     with torch.no_grad():
-        for images, *_ in tqdm.tqdm(loader, total=len(loader), desc="Batches"):
+        for images, *_ in tqdm(loader, total=len(loader), desc="Batches"):
             images = images.to(args.device).float() / 255
             outputs = model.encode(images)
             
@@ -68,7 +82,9 @@ def main():
     
     df = pd.DataFrame(encodings)
     df.to_csv('DAWIDD/encodings_train.csv')
+    torch.save(df, 'DAWIDD/encodings_train.pickle')
     print("--------- Write Complete ----------")
+    
     
 if __name__ == '__main__':
     main()
