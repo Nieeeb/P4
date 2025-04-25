@@ -25,6 +25,6 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_wo
             sampler.set_epoch(starting_epoch)
         
         loader = data.DataLoader(dataset, params.get('batch_size'), sampler=sampler,
-                                num_workers=num_workers, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+                                num_workers=num_workers, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False, shuffle=shuffle)
         
         return loader, sampler
