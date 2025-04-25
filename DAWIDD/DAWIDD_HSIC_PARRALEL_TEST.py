@@ -233,7 +233,7 @@ class DAWIDD_HSIC:
         return T_obs, p
 
 
-    def _test_for_independence_perm_fast(self, B: int, batch_size: int):
+    def _test_for_independence_perm_fast(self):
         n = len(self.Z)
         Z_np = np.vstack(self.Z)                  # [n, d]
         t_np = np.arange(n, dtype=float)
@@ -260,7 +260,7 @@ class DAWIDD_HSIC:
 
         if len(self.Z) >= self.min_window_size \
             and (self.total_seen % self.stride == 0):
-            T, p = self._test_for_independence_perm_fast(B=200)
+            T, p = self._test_for_independence_perm_fast()
         else:
             T, p = 0.0, 1.0
         self.hsic_history.append((T, p))
