@@ -38,12 +38,15 @@ def main():
     #add_dates()
     
 def add_dates():
-    df = pd.read_csv('DAWIDD/encodings_train.csv', index_col=0)
-    df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
+    #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
+    #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
+    
+    df = torch.load('DAWIDD/encodings_train_local.pickle')
     
     for index, row in tqdm(df.iterrows(), desc='Rows', total=len(df)):
         print(type(row['output']))
         print(row['output'])
+        break
 
 def write_inference(args, params):
     # data loader
@@ -53,7 +56,7 @@ def write_inference(args, params):
         img_folder=params['train_imgs'],
         starting_epoch=-1,
         num_workers=16,
-        shuffle = True
+        shuffle = False
     )
 
     # checkpoint path
