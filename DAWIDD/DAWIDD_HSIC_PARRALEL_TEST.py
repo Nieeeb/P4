@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from torch import nn
-
+from torch.cuda.amp import autocast
 import sys, os
 
 # compute P4 directory (one level up from DAWIDD/)
@@ -157,7 +157,7 @@ class DAWIDD_HSIC:
         if device == 'cuda':
             device = 'cuda:0'
         self.device = torch.device(device)
-        
+
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         raw = ckpt.get('model', ckpt)

@@ -58,8 +58,8 @@ def main():
             max_window_size=w,
             min_window_size=int(0.8 * w),
             stride= 10,
-            perm_reps=1000,               
-            perm_batch_size=125,
+            perm_reps=500,               
+            perm_batch_size=25,
             perm_devices=perm_gpus,
         )
         for name, w in {
