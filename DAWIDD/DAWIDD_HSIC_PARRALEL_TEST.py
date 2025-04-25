@@ -154,8 +154,10 @@ class DAWIDD_HSIC:
 
         self.stride = stride
 
-
+        if device == 'cuda':
+            device = 'cuda:0'
         self.device = torch.device(device)
+        
         self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
         ckpt = torch.load(ckpt_path, map_location=self.device)
         raw = ckpt.get('model', ckpt)
