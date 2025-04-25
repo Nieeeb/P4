@@ -34,8 +34,8 @@ def main():
     # data loader
     val_loader, _ = prepare_loader(
         args, params,
-        file_txt=params['val_txt'],
-        img_folder=params['val_imgs'],
+        file_txt=params['train_txt'],
+        img_folder=params['train_imgs'],
         starting_epoch=-1,
         num_workers=16,
         shuffle = False
@@ -46,7 +46,7 @@ def main():
     # ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
 
     # sampling rate
-    sr = 3985 # average samples pr day
+    sr = 48 # average clips pr day
 
     perm_gpus = list(range(1, torch.cuda.device_count()))
 
@@ -57,7 +57,7 @@ def main():
             device=args.device,
             max_window_size=w,
             min_window_size=int(0.8 * w),
-            stride= 10,
+            stride= 120, # amount of frames pr. clip
             perm_reps=500,               
             perm_batch_size=25,
             perm_devices=perm_gpus,
