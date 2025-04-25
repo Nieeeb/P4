@@ -96,7 +96,7 @@ def gaussian_grammat_torch(x: torch.Tensor, sigma: torch.Tensor = None) -> torch
 
 def HSIC_torch(x: torch.Tensor, y: torch.Tensor) -> float:
     # keep x,y in their original dtype (float32), but autocast will cast ops
-    with torch.inference_mode(), torch.autocast():                       # <— no args here
+    with torch.inference_mode(), torch.autocast('cuda'):                       # <— no args here
         Kx = gaussian_grammat_torch(x)
         Ky = gaussian_grammat_torch(y)
         Cx = centering_torch(Kx)
@@ -116,7 +116,7 @@ def HSIC_batch(Xb, Yb):
     Xb: [B, n, d], Yb: [B, n, 1]
     """
     # everything inside here will be FP16 on the GPU
-    with torch.inference_mode(), torch.autocast():
+    with torch.inference_mode(), torch.autocast('cuda'):
         Kx = centering_torch(gaussian_grammat_torch(Xb))
         Ky = centering_torch(gaussian_grammat_torch(Yb))
         M  = Kx @ Ky                   # [B, n, n]
