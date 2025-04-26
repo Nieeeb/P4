@@ -63,7 +63,7 @@ def main():
             perm_devices=perm_gpus,
         )
         for name, w in {
-            'daily':    1 * sr}.items()
+            'hourly':    2}.items()
     }
 
     # grab encoder once
