@@ -46,7 +46,7 @@ def main():
     # ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
 
     # sampling rate
-    sr = 2 # average clips pr day
+    sr = 48 # average clips pr day
 
     perm_gpus = list(range(1, torch.cuda.device_count()))
 
@@ -63,7 +63,7 @@ def main():
             perm_devices=perm_gpus,
         )
         for name, w in {
-            'hourly':    1 * sr}.items()
+            'daily':    1 * sr}.items()
     }
 
     # grab encoder once
