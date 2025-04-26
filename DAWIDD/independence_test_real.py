@@ -55,15 +55,15 @@ def main():
         name: DAWIDD_HSIC(
             ckpt_path=ckpt,
             device=args.device,
-            max_window_size=w,
-            min_window_size=int(0.8 * w),
+            max_window_size=sr ,
+            min_window_size=int(0.8 * sr),
             stride= 120, # amount of frames pr. clip
             perm_reps=500,               
             perm_batch_size=25,
             perm_devices=perm_gpus,
         )
         for name, w in {
-            'hourly':    2}.items()
+            'hourly':    1 * sr}.items()
     }
 
     # grab encoder once
