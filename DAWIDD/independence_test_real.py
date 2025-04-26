@@ -63,7 +63,7 @@ def main():
             perm_devices=perm_gpus,
         )
         for name, w in {
-            'weekly':    sr}.items()
+            'biweekly':    sr}.items()
     }
 
     # grab encoder once
