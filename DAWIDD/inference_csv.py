@@ -14,6 +14,8 @@ from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 from utils import util
 from nets.autoencoder import ConvAutoencoder
+from sklearn.cluster import DBSCAN
+import copy
 
 def main():
     parser = argparse.ArgumentParser()
@@ -38,35 +40,66 @@ def main():
         params = yaml.safe_load(f)
         
     #write_inference(args, params)
-    add_dates(args, params)
+    data = add_dates(args, params)
+    print(data.head())
+    monthly_data = group_by_month(data)
+    #distances_from_baseline = calculate_distance_from_baseline(monthly_data, baseline_month=2)
+    distances = calculate_distances(monthly_data)
+    list_form = [d for d in distances.values()]
+    avg = sum(list_form) / len(list_form)
+    
+    print(f"Average distance between months: {avg}")
+    
+    flat = flatten_output(data)
+    flat.to_csv('DAWIDD/flatten.csv')
+    print(flat)
+    print(data['flat_output'])
+    dbscan = DBSCAN(avg,
+                    min_samples=100,
+                    n_jobs=-1,
+                    metric='euclidean'
+                    ).fit(data['flat_output'])
+    #clusterings = dbscan.fit_predict(data['flat_output'])
+    #print(clusterings)
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
-    df = torch.load('DAWIDD/encodings_train.pickle')
+    df = torch.load('DAWIDD/encodings_valid_local.pickle')
     
-    filenames = pd.Series(get_txt(file_txt=params['train_txt'],
-                        img_folder=params['train_imgs']))
+    filenames = pd.Series(get_txt(file_txt=params['val_txt'],
+                        img_folder=params['val_imgs']))
     
     datetimes = pd.Series(extract_datetimes(filenames))
     
     df['filename'] = filenames.values
     
     df['datetime'] = datetimes.values
-    
+        
+    return df
+
+def flatten_output(data):
+    working_data = copy.deepcopy(data)
+    working_data['flat_output'] = data['output'].apply(lambda x: x.flatten())
+    df = pd.DataFrame(working_data['flat_output'].tolist(), columns=[x for x in range(len(working_data.iloc[0]['flat_output']))])
+    return df
+
+def group_by_month(data):
     monthly_data = defaultdict(list)
-    for index, row in tqdm(df.iterrows(), desc="Grouping Data by Month", total=(len(df))):
+    for index, row in tqdm(data.iterrows(), desc="Grouping Data by Month", total=(len(data))):
         month = row['datetime'].month
         monthly_data[month].append(row['output'])
+        
+    return monthly_data
     
+def calculate_distance_from_baseline(monthly_data, baseline_month):
     monthly_centroids = {}
     for key, data_group in tqdm(monthly_data.items(), desc='Calculating Centroids', total=len(monthly_data)):
         stacked = np.stack(data_group)  # shape: (N, 256, 6, 9)
         centroid = np.mean(stacked, axis=0)  # shape: (256, 6, 9)
         monthly_centroids[key] = centroid
     
-    baseline_month = 2
     baseline_centroid = monthly_centroids[baseline_month].flatten()
     
     distances = {}
@@ -80,6 +113,31 @@ def add_dates(args, params):
         
     for key, dist in distances.items():
         print(f"Distance from baseline month {baseline_month} to month {key}: {dist:.4f}")
+    
+    return distances
+
+def calculate_distances(monthly_data):
+    monthly_centroids = {}
+    for key, data_group in tqdm(monthly_data.items(), desc='Calculating Centroids', total=len(monthly_data)):
+        stacked = np.stack(data_group)  # shape: (N, 256, 6, 9)
+        centroid = np.mean(stacked, axis=0)  # shape: (256, 6, 9)
+        monthly_centroids[key] = centroid
+    
+    distances = {}
+    for key, centroid in tqdm(monthly_centroids.items(), desc="Calculating distances between months", total=len(monthly_centroids)):
+        for key1, centroid1 in monthly_centroids.items():
+            if key == key1:
+                continue
+            if (int(key), int(key1)) in distances.keys() or (int(key1), int(key)) in distances.keys():
+                pass
+            flat_centroid = centroid.flatten()
+            flat_centroid_1 = centroid1.flatten()
+            distance = euclidean(flat_centroid, flat_centroid_1)
+            distances[(int(key), int(key1))] = distance
+    
+    for key, dist in distances.items():
+        print(f"Distance from month {key[0]} to month {key[1]}: {dist:.4f}")
+    return distances
 
 def write_inference(args, params):
     # data loader
@@ -93,8 +151,8 @@ def write_inference(args, params):
     )
 
     # checkpoint path
-    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    #ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
+    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
+    ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
