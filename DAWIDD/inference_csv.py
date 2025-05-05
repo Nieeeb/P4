@@ -66,7 +66,8 @@ def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
-    df = torch.load('DAWIDD/encodings_valid_local.pickle')
+    #df = torch.load('DAWIDD/encodings_valid_local.pickle')
+    df = torch.load('DAWIDD/encodings_train.pickle')
     
     filenames = pd.Series(get_txt(file_txt=params['val_txt'],
                         img_folder=params['val_imgs']))
