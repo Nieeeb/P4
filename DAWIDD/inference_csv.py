@@ -69,8 +69,8 @@ def add_dates(args, params):
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
     df = torch.load('DAWIDD/encodings_train.pickle')
     
-    filenames = pd.Series(get_txt(file_txt=params['val_txt'],
-                        img_folder=params['val_imgs']))
+    filenames = pd.Series(get_txt(file_txt=params['train_txt'],
+                        img_folder=params['train_imgs']))
     
     datetimes = pd.Series(extract_datetimes(filenames))
     
