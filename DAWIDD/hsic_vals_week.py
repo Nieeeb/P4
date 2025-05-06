@@ -1,4 +1,4 @@
-from DAWIDD.inference_csv import add_dates
+from inference_csv import add_dates
 import pandas as pd
 import numpy as np
 
