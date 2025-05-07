@@ -1,7 +1,3 @@
-from inference_csv import add_dates
-import pandas as pd
-import numpy as np
-
 import argparse
 import os
 import yaml
@@ -47,12 +43,21 @@ def main():
     data = add_dates(args, params)
     print(data.head())
     weekly_data = group_by_week(data)
-    #distances_from_baseline = calculate_distance_from_baseline(weekly_data, baseline_week=2)
-    distances = calculate_distances(weekly_data)
-    list_form = [d for d in distances.values()]
+    distances_from_baseline = calculate_distance_from_baseline(weekly_data, baseline_week=6)
+    #distances = calculate_distances(weekly_data)
+    list_form = [d for d in distances_from_baseline.values()]
     avg = sum(list_form) / len(list_form)
     
     print(f"Average distance between weeks: {avg}")
+    
+    # Save distances to CSV
+    distances_df = pd.DataFrame([
+        {'week_1': k[0], 'week_2': k[1], 'distance': v}
+        for k, v in distances_from_baseline.items()
+    ])
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    distances_df.to_csv(os.path.join(script_dir, 'weekly_distances.csv'), index=False)
+    print(f"Distances saved to {os.path.join(script_dir, 'weekly_distances.csv')}")
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
@@ -132,46 +137,6 @@ def calculate_distances(weekly_data):
         print(f"Distance from week {key[0]} to week {key[1]}: {dist:.4f}")
     return distances
 
-#def write_inference(args, params):
-    # data loader
-    loader, _ = prepare_loader(
-        args, params,
-        file_txt=params['val_txt'],
-        img_folder=params['val_imgs'],
-        starting_epoch=-1,
-        num_workers=16,
-        shuffle = False
-    )
-
-    # checkpoint path
-    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
-    
-    device = torch.device(args.local_rank)
-    model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
-    ckpt = torch.load(ckpt, map_location=device)
-    raw = ckpt.get('model', ckpt)
-    stripped = {k.replace('module.', ''): v for k, v in raw.items()}
-    model.load_state_dict(stripped)
-    model.eval()
-    
-    encodings = []
-    with torch.no_grad():
-        for images, *_ in tqdm(loader, total=len(loader), desc="Batches"):
-            images = images.to(args.device).float() / 255
-            outputs = model.encode(images)
-            
-            for output in outputs:
-                encoding = {
-                    'output': output.cpu().numpy()
-                }
-                encodings.append(encoding)
-    
-    df = pd.DataFrame(encodings)
-    #df.to_csv('DAWIDD/encodings_valid_local.csv')
-    torch.save(df, 'DAWIDD/encodings_valid_local.pickle')
-    print("--------- Write Complete ----------")
-    
 def get_txt(file_txt, img_folder):
     filenames = []
         

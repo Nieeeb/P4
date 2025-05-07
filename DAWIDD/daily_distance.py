@@ -47,12 +47,20 @@ def main():
     data = add_dates(args, params)
     print(data.head())
     daily_data = group_by_day(data)
-    #distances_from_baseline = calculate_distance_from_baseline(daily_data, baseline_day=2)
-    distances = calculate_distances(daily_data)
-    list_form = [d for d in distances.values()]
+    distances_from_baseline = calculate_distance_from_baseline(daily_data, baseline_day=40)
+    #distances = calculate_distances(daily_data)
+    list_form = [d for d in distances_from_baseline.values()]
     avg = sum(list_form) / len(list_form)
     
     print(f"Average distance between days: {avg}")
+
+    distances_df = pd.DataFrame([
+        {'week_1': k[0], 'week_2': k[1], 'distance': v}
+        for k, v in distances_from_baseline.items()
+    ])
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    distances_df.to_csv(os.path.join(script_dir, 'daily_distances.csv'), index=False)
+    print(f"Distances saved to {os.path.join(script_dir, 'daily_distances.csv')}")
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
