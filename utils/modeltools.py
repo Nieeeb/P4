@@ -116,3 +116,8 @@ def load_checkpoint_for_evaluation(args, params):
     epoch = state_dict['epoch']
     
     return model, optimizer, scheduler, epoch
+
+def difference(bagsub, input, background):
+    fgmask = bagsub.apply(input)
+
+    return fgmask

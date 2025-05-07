@@ -52,15 +52,20 @@ def main():
     
     flat = flatten_output(data)
     flat.to_csv('DAWIDD/flatten.csv')
-    print(flat)
-    print(data['flat_output'])
+    print(flat.head())
+    
+    skip_columns = ['filenames', 'datetime']
+    selected_columns = [col for col in flat.columns if col not in skip_columns]
     dbscan = DBSCAN(avg,
                     min_samples=100,
                     n_jobs=-1,
                     metric='euclidean'
-                    ).fit(data['flat_output'])
-    #clusterings = dbscan.fit_predict(data['flat_output'])
-    #print(clusterings)
+                    ).fit(flat[selected_columns])
+    torch.save(dbscan, "DAWIDD/dbscan.pickle")
+    clusterings = dbscan.fit_predict(flat[selected_columns])
+    
+    print(clusterings)
+    torch.save(clusterings, "DAWIDD/clusterings.pickle")
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
@@ -82,8 +87,15 @@ def add_dates(args, params):
 
 def flatten_output(data):
     working_data = copy.deepcopy(data)
-    working_data['flat_output'] = data['output'].apply(lambda x: x.flatten())
-    df = pd.DataFrame(working_data['flat_output'].tolist(), columns=[x for x in range(len(working_data.iloc[0]['flat_output']))])
+    flattenned = []
+    for index, row in tqdm(working_data.iterrows(), desc="Flattening data", total=len(working_data)):
+        row['flat_output'] = row['output'].flatten()
+        flat = row['flat_output'].tolist()
+        flattenned.append(flat)
+
+    df = pd.DataFrame(flattenned, columns=[x for x in range(len(flattenned[0]))])
+    df['filename'] = working_data['filename']
+    df['datetime'] = working_data['datetime']
     return df
 
 def group_by_month(data):

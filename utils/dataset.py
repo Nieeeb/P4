@@ -10,17 +10,21 @@ from PIL import Image
 from torch.utils import data
 from tqdm import tqdm
 import re
+from utils.modeltools import difference
 #from onlinetools import 
 
 FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'
 
 
 class Dataset(data.Dataset):
-    def __init__(self, filenames, input_size, params, augment):
+    def __init__(self, filenames, input_size, params, augment, chrono_difference=False):
         self.params = params
         self.mosaic = augment
         self.augment = augment
         self.input_size = input_size
+        self.chrono_difference = chrono_difference
+        if self.chrono_difference:
+            self.bagsub = cv2.createBackgroundSubtractorMOG2()
 
         # Read labels
         cache = self.load_label(filenames, self.params)
@@ -55,6 +59,7 @@ class Dataset(data.Dataset):
         #if True:
             # Load image
             image, shape = self.load_image(index)
+            
             h, w = image.shape[:2]
             #h, w = image.size
 
@@ -62,6 +67,15 @@ class Dataset(data.Dataset):
             image, ratio, pad = resize(image, self.input_size, self.augment)
             
             shapes = shape, ((h / shape[0], w / shape[1]), pad)  # for COCO mAP rescaling
+            
+            if self.chrono_difference:
+                try: 
+                    background, _ = self.load_image(index - 1)
+                    background, _, _ = resize(background, self.input_size, self.augment)
+                    
+                    image = difference(bagsub=self.bagsub, input=image, background=background)
+                except:
+                    pass
 
             label = self.labels[index].copy()
             #print(f"Beforre: {label}")
@@ -101,9 +115,8 @@ class Dataset(data.Dataset):
         #sample = image.transpose((2, 0, 1))[::-1]
         #sample = numpy.ascontiguousarray(sample)
         sample = numpy.ascontiguousarray(image)
-        sample = torch.from_numpy(sample)
+        sample = torch.from_numpy(sample)        
         sample = sample.unsqueeze(0)
-        
         #print(sample.shape)
         #return pil_to_tensor(image), target, shapes
         return sample, target, shapes
