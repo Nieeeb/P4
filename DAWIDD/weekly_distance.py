@@ -49,15 +49,16 @@ def main():
     avg = sum(list_form) / len(list_form)
     
     print(f"Average distance between weeks: {avg}")
+
+    # Save to CSV
+    output_data = data.head().copy()  # Get the first few rows of data
+    # Add a row for the average distance
+    avg_row = pd.DataFrame([['Average Distance', avg]], columns=['Metric', 'Value'])
+    output_data = pd.concat([output_data, avg_row], ignore_index=True)
+    output_data.to_csv('weekly_distance.csv', index=False)
+    print("Saved output to weekly_distance.csv")
     
-    # Save distances to CSV
-    distances_df = pd.DataFrame([
-        {'week_1': k[0], 'week_2': k[1], 'distance': v}
-        for k, v in distances_from_baseline.items()
-    ])
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    distances_df.to_csv(os.path.join(script_dir, 'weekly_distances.csv'), index=False)
-    print(f"Distances saved to {os.path.join(script_dir, 'weekly_distances.csv')}")
+
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
