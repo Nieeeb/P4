@@ -9,6 +9,7 @@ from utils.modeltools import save_checkpoint, load_or_create_state
 import torch.multiprocessing as mp
 from datetime import timedelta
 from utils.dataloader import prepare_loader
+import torchvision
 
 warnings.filterwarnings("ignore")
 
@@ -52,20 +53,25 @@ def cleanup():
 
 # Function for training an entire epoch
 # Logs to wandb
-def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch, model_type="yolo"):
+def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch, model_type="yolo", resize=False):
     m_loss = util.AverageMeter()
 
     # If in DDP, sampler needs current epoch
     # Used to determine which data shuffle to use if GPUs get desynced
     if args.world_size > 1:
         train_sampler.set_epoch(epoch)
+        
+    # Model set to train
+    model.train()
 
     # Iterates through the training set
     for batchidx, (samples, targets, shapes) in enumerate(train_loader):
         # Sends data to appropriate GPU device
         samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
-        # Model set to train
-        model.train()
+        
+        if resize:
+            resize = torchvision.transforms.Resize((128,128))
+            samples = resize(samples)
         
         optimizer.zero_grad()
 
@@ -105,7 +111,7 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
 
 # Function that validates the model on a validation set
 # Intended to be used during training and not for testing performance of model
-def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch, model_type="yolo"):
+def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch, model_type="yolo", resize=False):
     print(f"Beginning epoch validation for epoch {epoch + 1} on GPU {args.local_rank}")     
     v_loss = util.AverageMeter()
     
@@ -120,6 +126,10 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
         for batchidx, (samples, targets, shapes) in enumerate(validation_loader):
             # Sending data to appropriate GPU
             samples, targets = samples.to(args.local_rank), targets.to(args.local_rank)
+            
+            if resize:
+                resize = torchvision.transforms.Resize((128,128))
+                samples = resize(samples)
             
             samples = samples.float() / 255 # Input images are 8 bit single channel images. Converts to 0-1 floats
             

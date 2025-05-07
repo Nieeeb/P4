@@ -13,6 +13,8 @@ from train import setup, cleanup
 import numpy as np
 import cv2
 from display_images import display_targets
+from nets.autoencoder import ConvAutoencoder
+import torchvision
 
 def main():
     #Loading args from CLI
@@ -57,11 +59,14 @@ def main():
                     loader=validation_loader)
     
 def difference_test(args, params, loader):
+    model = ConvAutoencoder().cuda()
     for batchidx, (samples, targets, shapes) in enumerate(loader):
+        resize = torchvision.transforms.Resize((128,128))
+        samples = resize(samples)
         samples = samples.cuda()
         targets = targets.cuda()
         samples = samples.float() / 255
-        
+        output = model(samples)
         images, boxes = display_targets(samples, targets, shapes)
         for index, image in enumerate(images):
             cv2.imshow(f"{index}", image)

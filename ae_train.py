@@ -102,7 +102,8 @@ def train(rank, args, params):
                         train_sampler=train_sampler,
                         criterion=criterion,
                         epoch=epoch,
-                        model_type=params.get("model_type")
+                        model_type=params.get("model_type"),
+                        resize=True
                         )
             if args.local_rank == 0:
                 print(f"Validation for epoch {epoch + 1}")
@@ -112,7 +113,8 @@ def train(rank, args, params):
                                 validation_sampler=validation_sampler,
                                 criterion=criterion,
                                 epoch=epoch,
-                                model_type=params.get("model_type")
+                                model_type=params.get("model_type"),
+                                resize=True
                                 )    
         
             if args.local_rank == 0:
