@@ -48,12 +48,21 @@ def main():
     list_form = [d for d in distances_from_baseline.values()]
     avg = sum(list_form) / len(list_form)
     
-    print(f"Average distance between weeks: {avg}")
+    #print(f"Average distance between weeks: {avg}")
 
-    # Save to text file
+    # Print and save all distance statements to the text file
     with open('weekly_distance.txt', 'w') as f:
-        f.write(f"Average distance between weeks: {avg}")
-    print("Saved average distance to weekly_distance.txt")
+        for week, distance in distances_from_baseline.items():
+            statement = f"Distance from baseline week 6 to week {week}: {distance}"
+            print(statement)
+            f.write(statement + "\n")
+        
+        avg_statement = f"Average distance between weeks: {avg}"
+        print(avg_statement)
+        f.write(avg_statement + "\n")
+    
+    print("Saved all distances to weekly_distance.txt")
+
 
     
 def add_dates(args, params):
