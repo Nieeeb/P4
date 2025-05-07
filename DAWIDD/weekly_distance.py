@@ -50,14 +50,10 @@ def main():
     
     print(f"Average distance between weeks: {avg}")
 
-    # Save to CSV
-    output_data = data.head().copy()  # Get the first few rows of data
-    # Add a row for the average distance
-    avg_row = pd.DataFrame([['Average Distance', avg]], columns=['Metric', 'Value'])
-    output_data = pd.concat([output_data, avg_row], ignore_index=True)
-    output_data.to_csv('weekly_distance.csv', index=False)
-    print("Saved output to weekly_distance.csv")
-    
+    # Save to text file
+    with open('weekly_distance.txt', 'w') as f:
+        f.write(f"Average distance between weeks: {avg}")
+    print("Saved average distance to weekly_distance.txt")
 
     
 def add_dates(args, params):
