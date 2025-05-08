@@ -51,8 +51,8 @@ def main():
     #print(local_indices)
 
     # checkpoint path
-    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    ckpt = 'Data/temp/latest'
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
+    #ckpt = 'Data/temp/latest'
 
     # sampling rate (average clips per day)
     sr = 48 // 48
