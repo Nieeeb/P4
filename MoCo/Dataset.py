@@ -188,14 +188,10 @@ def main():
     setup_seed()
     setup(0, 1)
     dataset = GrayscalePatchDataset(patch_size=args['patch_size'])
-    sampler = DistributedSampler(dataset=dataset, shuffle=False, drop_last=False)
+    sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=False)
     sampler.set_epoch(-1)
     loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=sampler, drop_last=False, pin_memory=True)
     # plot_patch_pairs(loader)
-
-    encoder_q = DegradationEncoder(feature_dim=256)
-    encoder_k = DegradationEncoder(feature_dim=256)
-    encoder_k.load_state_dict(encoder_q.state_dict())
 
     moco_model = MoCo(Encoder,
                 dim=256, K=args['queue_size'],
@@ -211,19 +207,28 @@ def main():
 
     num_epochs = 1
     loss_fn = torch.nn.CrossEntropyLoss().cuda()
+    scaler = torch.amp.GradScaler(device=device)
 
     for epoch in range(num_epochs):
+        moco_model.train()
         sampler.set_epoch(epoch)
         for x1, x2, _ in loader:
+            #for i in range(10000):
+            optimizer.zero_grad()
             im_q = x1.to(device)
             im_k = x2.to(device)
-
             embeddings, logits, labels = moco_model(im_q, im_k)
+            print(logits)
+            #print(moco_model.queue)
+
             loss = loss_fn(logits, labels)
 
-            optimizer.zero_grad()
+            #scaled_loss = scaler.scale(loss)
             loss.backward()
+            #scaled_loss.backward()
             optimizer.step()
+            #scaler.step(optimizer)
+            #scaler.update()
 
             print(loss)
             #break

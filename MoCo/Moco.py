@@ -132,11 +132,16 @@ class MoCo(nn.Module):
             # Einstein sum is more intuitive
             # positive logits: Nx1
             l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
+            #print("positive")
+            #print(l_pos)
             # negative logits: NxK
             l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()])
+            #print("negative")
+            #print(l_neg)
 
             # logits: Nx(1+K)
             logits = torch.cat([l_pos, l_neg], dim=1)
+            #print(logits)
 
             # apply temperature
             logits /= self.T
