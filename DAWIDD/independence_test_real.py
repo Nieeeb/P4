@@ -6,7 +6,6 @@ import torch
 import tqdm
 import torch.distributed as dist
 
-
 # import the single-GPU DAWIDD_HSIC implementation
 from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
@@ -101,7 +100,6 @@ def main():
     starting_index = state['index']
 
     # processing loop
-
     for index, (images, _, _) in tqdm.tqdm(enumerate(val_loader), total=len(val_loader), desc="Batches"):
         if index < starting_index + 1:
             continue
@@ -125,7 +123,6 @@ def main():
     detector = detectors['quarterly']
     hsic_vals, p_vals = zip(*detector.hsic_history)
 
-
     # build local triplets
     local_triplets = list(zip(local_indices, hsic_vals, p_vals))
 
@@ -136,7 +133,6 @@ def main():
         gather_list = [None] * world_size
     else:
         gather_list = None
-
     dist.gather_object(local_triplets, gather_list, dst=0)
 
     if rank == 0:
