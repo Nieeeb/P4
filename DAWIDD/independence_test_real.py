@@ -5,6 +5,8 @@ import pandas as pd
 import torch
 import tqdm
 
+import torch.distributed as dist
+
 from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 from utils import util
@@ -41,6 +43,10 @@ def main():
         shuffle = False
     )
 
+    sampler = val_loader.sampler
+
+    local_indices = list(sampler)  # e.g. [rank, rank+8, rank+16, …] if shuffle=False
+
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
     # ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
@@ -72,7 +78,6 @@ def main():
 
     # processing loop
     total = len(val_loader.dataset)
-    print(f"Processing {total} samples with stride={args.stride}…")
     for images, *_ in tqdm.tqdm(val_loader, total=len(val_loader), desc="Batches"):
         # images: [B, C, H, W]
         images = images.to(args.device).float()
@@ -83,17 +88,39 @@ def main():
         for det in detectors.values():
             det.add_batch(z_batch)
 
-    # write out CSVs
-    for name, det in detectors.items():
-        # unpack the history into two lists
-        hsic_vals, p_vals = zip(*det.hsic_history)  # det.hsic_history is now List[Tuple[float, float]]
+
+    # unpack your history
+    hsic_vals, p_vals = zip(*det.hsic_history)
+    
+    # 2. build a list of triples (global_idx, hsic, p) on each rank
+    local_triplets = list(zip(local_indices, hsic_vals, p_vals))
+    
+    # 3. gather them all to rank 0
+    world_size = dist.get_world_size()
+    rank        = dist.get_rank()
+    
+    if rank == 0:
+        gather_list = [None] * world_size
+    else:
+        gather_list = None
+    
+    # gather_object is available in PyTorch ≥1.8
+    dist.gather_object(local_triplets, gather_list, dst=0)
+    
+    if rank == 0:
+        # flatten and sort by the original sample index
+        full = [t for per_rank in gather_list for t in per_rank]
+        full.sort(key=lambda x: x[0])
+        
+        # split back out into columns
+        idxs, hsics, ps = zip(*full)
         df = pd.DataFrame({
-            'hsic_val': hsic_vals,
-            'p_value': p_vals
+            'sample_index': idxs,
+            'hsic_val':      hsics,
+            'p_value':       ps
         })
-        out_file = f"{name}_hsic_pvalues.csv"
-        df.to_csv(out_file, index_label='sample_index')
-        print(f"Wrote {out_file} ({len(df)} samples)")
+        df.to_csv('all_ranks_hsic.csv', index=False)
+        print("Wrote all_ranks_hsic.csv (749000 rows)")
 
 if __name__ == '__main__':
     main()

@@ -296,5 +296,4 @@ if __name__ == "__main__":
                                  data_split="test1")
 
 
-    #write_absolute_jpg_paths(dataloader, "Data/train.txt")
     write_relative_jpg_paths(dataloader, "Data/valid.txt")
