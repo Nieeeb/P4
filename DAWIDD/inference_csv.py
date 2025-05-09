@@ -14,12 +14,12 @@ from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 from utils import util
 from nets.autoencoder import ConvAutoencoder
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, KMeans
 import copy
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--args_file', type=str, default='utils/args.yaml',
+    parser.add_argument('--args_file', type=str, default='utils/ae_args.yaml',
                         help="YAML file with data paths & loader params")
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--stride', type=int, default=3,
@@ -39,7 +39,7 @@ def main():
     with open(args.args_file) as f:
         params = yaml.safe_load(f)
         
-    #write_inference(args, params)
+    write_inference(args, params)
     data = add_dates(args, params)
     print(data.head())
     monthly_data = group_by_month(data)
@@ -56,13 +56,16 @@ def main():
     
     skip_columns = ['filenames', 'datetime']
     selected_columns = [col for col in flat.columns if col not in skip_columns]
-    dbscan = DBSCAN(avg,
-                    min_samples=100,
-                    n_jobs=-1,
-                    metric='euclidean'
+    #dbscan = DBSCAN(avg,
+    #                min_samples=100,
+    #                n_jobs=-1,
+    #                metric='euclidean'
+    #                ).fit(flat[selected_columns])
+    kmeans = KMeans(n_clusters=20,
+                    random_state=0
                     ).fit(flat[selected_columns])
-    torch.save(dbscan, "DAWIDD/dbscan.pickle")
-    clusterings = dbscan.fit_predict(flat[selected_columns])
+    torch.save(kmeans, "DAWIDD/kmeans.pickle")
+    clusterings = kmeans.predict(flat[selected_columns])
     
     print(clusterings)
     torch.save(clusterings, "DAWIDD/clusterings.pickle")
@@ -71,11 +74,11 @@ def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
-    df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    #df = torch.load('DAWIDD/encodings_train.pickle')
+    #df = torch.load('DAWIDD/encodings_valid_local.pickle')
+    df = torch.load('DAWIDD/encodings_train.pickle')
     
-    filenames = pd.Series(get_txt(file_txt=params['val_txt'],
-                        img_folder=params['val_imgs']))
+    filenames = pd.Series(get_txt(file_txt=params['train_txt'],
+                        img_folder=params['train_imgs']))
     
     datetimes = pd.Series(extract_datetimes(filenames))
     
@@ -164,8 +167,8 @@ def write_inference(args, params):
     )
 
     # checkpoint path
-    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    ckpt = 'Data/temp/latest'
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
+    #ckpt = 'Data/temp/latest'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
@@ -177,7 +180,7 @@ def write_inference(args, params):
     
     encodings = []
     with torch.no_grad():
-        for images, *_ in tqdm(loader, total=len(loader), desc="Batches"):
+        for images, *_ in tqdm(loader, total=len(loader), desc="Encoding Batches"):
             images = images.to(args.device).float() / 255
             outputs = model.encode(images)
             
