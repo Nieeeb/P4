@@ -71,11 +71,11 @@ def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
-    #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_train.pickle')
+    df = torch.load('DAWIDD/encodings_valid_local.pickle')
+    #df = torch.load('DAWIDD/encodings_train.pickle')
     
-    filenames = pd.Series(get_txt(file_txt=params['train_txt'],
-                        img_folder=params['train_imgs']))
+    filenames = pd.Series(get_txt(file_txt=params['val_txt'],
+                        img_folder=params['val_imgs']))
     
     datetimes = pd.Series(extract_datetimes(filenames))
     
@@ -165,7 +165,7 @@ def write_inference(args, params):
 
     # checkpoint path
     #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    ckpt = '/home/nieb/Projects/DAKI Projects/P4/DAWIDD/ae_complex'
+    ckpt = 'Data/temp/latest'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)

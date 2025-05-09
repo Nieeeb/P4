@@ -50,10 +50,6 @@ def main():
     local_indices = list(sampler)
     #print(local_indices)
 
-    sampler = val_loader.sampler
-
-    local_indices = list(sampler)  # e.g. [rank, rank+8, rank+16, …] if shuffle=False
-
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
     #ckpt = 'Data/temp/latest'

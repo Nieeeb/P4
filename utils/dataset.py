@@ -472,3 +472,94 @@ class Albumentations:
             image = x['image']
             label = numpy.array([[c, *b] for c, b in zip(x['class_labels'], x['bboxes'])])
         return image, label
+
+
+class DASRDataset(Dataset):
+    def __init__(self, filenames, input_size, params, augment, chrono_difference=False, train_txt=None, val_txt=None):
+        super().__init__(filenames, input_size, params, augment, chrono_difference, train_txt, val_txt)
+    
+    
+    def __getitem__(self, index):       
+    #print("I am being called")
+        index = self.indices[index]
+
+        params = self.params
+        # mosaic = self.mosaic and random.random() < params['mosaic']
+
+        if self.mosaic:
+            shapes = None
+            # Load MOSAIC
+            image, label = self.load_mosaic(index, params)
+            # MixUp augmentation
+            #if random.random() < params['mix_up']:
+            #    index = random.choice(self.indices)
+            #    mix_image1, mix_label1 = image, label
+            #    mix_image2, mix_label2 = self.load_mosaic(index, params)
+
+        #         image, label = mix_up(mix_image1, mix_label1, mix_image2, mix_label2)
+        else:
+        #if True:
+            # Load image
+            image, shape = self.load_image(index)
+            
+            h, w = image.shape[:2]
+            #h, w = image.size
+
+            # Resize
+            image, ratio, pad = resize(image, self.input_size, self.augment)
+            
+            shapes = shape, ((h / shape[0], w / shape[1]), pad)  # for COCO mAP rescaling
+            
+            if self.chrono_difference:
+                try: 
+                    background, _ = self.load_image(index - 1)
+                    background, _, _ = resize(background, self.input_size, self.augment)
+                    
+                    image = difference(bagsub=self.bagsub, input=image, background=background)
+                except:
+                    pass
+
+            label = self.labels[index].copy()
+            #print(f"Beforre: {label}")
+            #if label.size:
+            #    label[:, 1:] = wh2xy(label[:, 1:], ratio[0] * w, ratio[1] * h, pad[0], pad[1])
+                #print(f"middle: {label}")
+            # if self.augment:
+            #     image, label = random_perspective(image, label, params)
+        nl = len(label)  # number of labels
+        #if nl:
+        #    label[:, 1:5] = xy2wh(label[:, 1:5], image.shape[1], image.shape[0])
+            #print(f"After: {label}")
+            #label[:, 1:5] = xy2wh(label[:, 1:5], image.size[1], image.size[0])
+
+        # if self.augment:
+        #     # Albumentations
+        #     image, label = self.albumentations(image, label)
+        #     nl = len(label)  # update after albumentations
+        #     # HSV color-space
+        #     augment_hsv(image, params)
+        #     # Flip up-down
+        #     if random.random() < params['flip_ud']:
+        #         image = numpy.flipud(image)
+        #         if nl:
+        #             label[:, 2] = 1 - label[:, 2]
+        #     # Flip left-right
+        #     if random.random() < params['flip_lr']:
+        #         image = numpy.fliplr(image)
+        #         if nl:
+        #             label[:, 1] = 1 - label[:, 1]
+
+        target = torch.zeros((nl, 6))
+        if nl:
+            target[:, 1:] = torch.from_numpy(label)
+
+        # Convert HWC to CHW, BGR to RGB
+        #sample = image.transpose((2, 0, 1))[::-1]
+        #sample = numpy.ascontiguousarray(sample)
+        sample = numpy.ascontiguousarray(image)
+        sample = torch.from_numpy(sample)        
+        sample = sample.unsqueeze(0)
+        #print(sample.shape)
+        #return pil_to_tensor(image), target, shapes
+        return sample, target, shapes
+        #return torch.from_numpy(sample), target, shapes
