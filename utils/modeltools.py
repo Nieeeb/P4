@@ -5,6 +5,7 @@ from typing import Tuple
 from nets.nn import yolo_v8_m
 from nets.autoencoder import ConvAutoencoder
 from collections import OrderedDict
+import cv2
 
 # Method for saving trainign state to a given path
 # Path should be a folder
@@ -116,3 +117,9 @@ def load_checkpoint_for_evaluation(args, params):
     epoch = state_dict['epoch']
     
     return model, optimizer, scheduler, epoch
+
+def difference(bagsub, input, background):
+    fgmask = bagsub.apply(input)
+    output = cv2.bitwise_and(input, fgmask, mask=fgmask)
+
+    return output

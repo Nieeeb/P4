@@ -10,20 +10,26 @@ from PIL import Image
 from torch.utils import data
 from tqdm import tqdm
 import re
+from utils.modeltools import difference
 #from onlinetools import 
 
 FORMATS = 'bmp', 'dng', 'jpeg', 'jpg', 'mpo', 'png', 'tif', 'tiff', 'webp'
 
 
 class Dataset(data.Dataset):
-    def __init__(self, filenames, input_size, params, augment):
+    def __init__(self, filenames, input_size, params, augment, chrono_difference=False, train_txt=None, val_txt=None):
         self.params = params
         self.mosaic = augment
         self.augment = augment
         self.input_size = input_size
+        self.chrono_difference = chrono_difference
+        if self.chrono_difference:
+            self.bagsub = cv2.createBackgroundSubtractorMOG2()
+        self.train_txt = train_txt
+        self.val_txt = val_txt
 
         # Read labels
-        cache = self.load_label(filenames, self.params)
+        cache = self.load_label(filenames, self.params, self.train_txt, self.val_txt)
         labels, shapes = zip(*cache.values())
         self.labels = list(labels)
         self.shapes = numpy.array(shapes, dtype=numpy.float64)
@@ -55,6 +61,7 @@ class Dataset(data.Dataset):
         #if True:
             # Load image
             image, shape = self.load_image(index)
+            
             h, w = image.shape[:2]
             #h, w = image.size
 
@@ -62,6 +69,15 @@ class Dataset(data.Dataset):
             image, ratio, pad = resize(image, self.input_size, self.augment)
             
             shapes = shape, ((h / shape[0], w / shape[1]), pad)  # for COCO mAP rescaling
+            
+            if self.chrono_difference:
+                try: 
+                    background, _ = self.load_image(index - 1)
+                    background, _, _ = resize(background, self.input_size, self.augment)
+                    
+                    image = difference(bagsub=self.bagsub, input=image, background=background)
+                except:
+                    pass
 
             label = self.labels[index].copy()
             #print(f"Beforre: {label}")
@@ -101,9 +117,8 @@ class Dataset(data.Dataset):
         #sample = image.transpose((2, 0, 1))[::-1]
         #sample = numpy.ascontiguousarray(sample)
         sample = numpy.ascontiguousarray(image)
-        sample = torch.from_numpy(sample)
+        sample = torch.from_numpy(sample)        
         sample = sample.unsqueeze(0)
-        
         #print(sample.shape)
         #return pil_to_tensor(image), target, shapes
         return sample, target, shapes
@@ -215,18 +230,24 @@ class Dataset(data.Dataset):
         return torch.stack(samples, 0), torch.cat(targets, 0), shapes
 
     @staticmethod
-    def load_label(filenames, params):
+    def load_label(filenames, params, train_txt, val_txt):
         image_path = f'{os.path.dirname(filenames[0])}'
         #print(image_path)
         folder_name = image_path.split(f"{os.sep}")[-1]
         #print(folder_name)
         cache_parent = image_path.replace(folder_name, '')
-        train_txt = params.get('train_txt')
-        val_txt = params.get('val_txt')
+        if train_txt is None:
+            t_txt = params.get('train_txt')
+        else:
+            t_txt = train_txt
+        if val_txt is None:
+            v_txt = params.get('val_txt')
+        else:
+            v_txt = val_txt
         start = '/'
         end = '.txt'
-        run_name = re.search(f"{start}(.*){end}", train_txt).group(1)
-        valid_name = re.search(f"{start}(.*){end}", val_txt).group(1)
+        run_name = re.search(f"{start}(.*){end}", t_txt).group(1)
+        valid_name = re.search(f"{start}(.*){end}", v_txt).group(1)
         #print(run_name)
         cache_path = f"{os.path.join(cache_parent, run_name)}_{valid_name}_{folder_name}.cache"
         #print(cache_path)    

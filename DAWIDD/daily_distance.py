@@ -1,3 +1,7 @@
+from inference_csv import add_dates
+import pandas as pd
+import numpy as np
+
 import argparse
 import os
 import yaml
@@ -42,30 +46,21 @@ def main():
     #write_inference(args, params)
     data = add_dates(args, params)
     print(data.head())
-    monthly_data = group_by_month(data)
-    #distances_from_baseline = calculate_distance_from_baseline(monthly_data, baseline_month=2)
-    distances = calculate_distances(monthly_data)
-    list_form = [d for d in distances.values()]
+    daily_data = group_by_day(data)
+    distances_from_baseline = calculate_distance_from_baseline(daily_data, baseline_day=40)
+    #distances = calculate_distances(daily_data)
+    list_form = [d for d in distances_from_baseline.values()]
     avg = sum(list_form) / len(list_form)
     
-    print(f"Average distance between months: {avg}")
-    
-    flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten.csv')
-    print(flat.head())
-    
-    skip_columns = ['filenames', 'datetime']
-    selected_columns = [col for col in flat.columns if col not in skip_columns]
-    dbscan = DBSCAN(avg,
-                    min_samples=100,
-                    n_jobs=-1,
-                    metric='euclidean'
-                    ).fit(flat[selected_columns])
-    torch.save(dbscan, "DAWIDD/dbscan.pickle")
-    clusterings = dbscan.fit_predict(flat[selected_columns])
-    
-    print(clusterings)
-    torch.save(clusterings, "DAWIDD/clusterings.pickle")
+    print(f"Average distance between days: {avg}")
+
+    # Save to CSV
+    output_data = data.head().copy()  # Get the first few rows of data
+    # Add a row for the average distance
+    avg_row = pd.DataFrame([['Average Distance', avg]], columns=['Metric', 'Value'])
+    output_data = pd.concat([output_data, avg_row], ignore_index=True)
+    output_data.to_csv('daily_distance.csv', index=False)
+    print("Saved output to daily_distance.csv")
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
@@ -87,37 +82,30 @@ def add_dates(args, params):
 
 def flatten_output(data):
     working_data = copy.deepcopy(data)
-    flattenned = []
-    for index, row in tqdm(working_data.iterrows(), desc="Flattening data", total=len(working_data)):
-        row['flat_output'] = row['output'].flatten()
-        flat = row['flat_output'].tolist()
-        flattenned.append(flat)
-
-    df = pd.DataFrame(flattenned, columns=[x for x in range(len(flattenned[0]))])
-    df['filename'] = working_data['filename']
-    df['datetime'] = working_data['datetime']
+    working_data['flat_output'] = data['output'].apply(lambda x: x.flatten())
+    df = pd.DataFrame(working_data['flat_output'].tolist(), columns=[x for x in range(len(working_data.iloc[0]['flat_output']))])
     return df
 
-def group_by_month(data):
-    monthly_data = defaultdict(list)
-    for index, row in tqdm(data.iterrows(), desc="Grouping Data by Month", total=(len(data))):
-        month = row['datetime'].month
-        monthly_data[month].append(row['output'])
+def group_by_day(data):
+    daily_data = defaultdict(list)
+    for index, row in tqdm(data.iterrows(), desc="Grouping Data by Day", total=(len(data))):
+        day = row['datetime'].toordinal()  # Unique identifier for each day
+        daily_data[day].append(row['output'])
         
-    return monthly_data
+    return daily_data
     
-def calculate_distance_from_baseline(monthly_data, baseline_month):
-    monthly_centroids = {}
-    for key, data_group in tqdm(monthly_data.items(), desc='Calculating Centroids', total=len(monthly_data)):
+def calculate_distance_from_baseline(daily_data, baseline_day):
+    daily_centroids = {}
+    for key, data_group in tqdm(daily_data.items(), desc='Calculating Centroids', total=len(daily_data)):
         stacked = np.stack(data_group)  # shape: (N, 256, 6, 9)
         centroid = np.mean(stacked, axis=0)  # shape: (256, 6, 9)
-        monthly_centroids[key] = centroid
+        daily_centroids[key] = centroid
     
-    baseline_centroid = monthly_centroids[baseline_month].flatten()
+    baseline_centroid = daily_centroids[baseline_day].flatten()
     
     distances = {}
-    for key, centroid in tqdm(monthly_centroids.items(), desc="Calculating distances from baseline month", total=len(monthly_centroids)):
-        if key == baseline_month:
+    for key, centroid in tqdm(daily_centroids.items(), desc="Calculating distances from baseline day", total=len(daily_centroids)):
+        if key == baseline_day:
             continue
         flat_centroid = centroid.flatten()
         distance = euclidean(baseline_centroid, flat_centroid)
@@ -125,20 +113,20 @@ def calculate_distance_from_baseline(monthly_data, baseline_month):
         distances[key] = distance
         
     for key, dist in distances.items():
-        print(f"Distance from baseline month {baseline_month} to month {key}: {dist:.4f}")
+        print(f"Distance from baseline day {key} to day {key}: {dist:.4f}")
     
     return distances
 
-def calculate_distances(monthly_data):
-    monthly_centroids = {}
-    for key, data_group in tqdm(monthly_data.items(), desc='Calculating Centroids', total=len(monthly_data)):
+def calculate_distances(daily_data):
+    daily_centroids = {}
+    for key, data_group in tqdm(daily_data.items(), desc='Calculating Centroids', total=len(daily_data)):
         stacked = np.stack(data_group)  # shape: (N, 256, 6, 9)
         centroid = np.mean(stacked, axis=0)  # shape: (256, 6, 9)
-        monthly_centroids[key] = centroid
+        daily_centroids[key] = centroid
     
     distances = {}
-    for key, centroid in tqdm(monthly_centroids.items(), desc="Calculating distances between months", total=len(monthly_centroids)):
-        for key1, centroid1 in monthly_centroids.items():
+    for key, centroid in tqdm(daily_centroids.items(), desc="Calculating distances between days", total=len(daily_centroids)):
+        for key1, centroid1 in daily_centroids.items():
             if key == key1:
                 continue
             if (int(key), int(key1)) in distances.keys() or (int(key1), int(key)) in distances.keys():
@@ -149,10 +137,10 @@ def calculate_distances(monthly_data):
             distances[(int(key), int(key1))] = distance
     
     for key, dist in distances.items():
-        print(f"Distance from month {key[0]} to month {key[1]}: {dist:.4f}")
+        print(f"Distance from day {key[0]} to day {key[1]}: {dist:.4f}")
     return distances
 
-def write_inference(args, params):
+#def write_inference(args, params):
     # data loader
     loader, _ = prepare_loader(
         args, params,

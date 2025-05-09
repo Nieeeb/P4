@@ -13,7 +13,7 @@ from utils.modeltools import load_latest_checkpoint, save_checkpoint, check_chec
 from utils.dataloader import prepare_loader
 from utils.modeltools import save_checkpoint, load_or_create_state, load_checkpoint_for_evaluation
 
-
+import pandas as pd
 from collections import OrderedDict
 import numpy
 
@@ -43,31 +43,68 @@ def main():
         params = yaml.safe_load( cf_file.read())
         
     #mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
-    test(args, params)
+    
+        test_txts = [
+        "Data/Aprvalid.txt",
+        "Data/Febvalid.txt",
+        "Data/Augvalid.txt",
+        "Data/Janvalid.txt",
+        "Data/Mayvalid.txt",
+        "Data/Julvalid.txt",
+        "Data/Junvalid.txt",
+        "Data/Marvalid.txt"
+    ]
+        # Loading model
+    # Loads if a valid checkpoint is found, otherwise creates a new model
+    model, _, _, starting_epoch = load_checkpoint_for_evaluation(args, params)
+
+    #Dataloading Validation
+    loaders = []
+    results = []
+    for txt in test_txts:
+        filenames = []
+        
+        with open(txt) as reader:
+            for filename in reader.readlines():
+                filename = filename.rstrip().split('/')[-1]
+                filenames.append(params.get('val_imgs') + filename)
+
+        if args.local_rank == 0:
+            print(f"Number of files found for {txt}: {len(filenames)}")
+        params['val_txt'] = txt
+        dataset = Dataset(filenames, params.get('input_size'), params, augment=params.get('augment'), chrono_difference=False)
+        loader = data.DataLoader(dataset, params.get('batch_size'),
+                                num_workers=16, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
+
+        map50, mean_ap = test(args, params, model, loader)
+        result = {
+            'txt': txt,
+            'map50': map50,
+            'mean_ap': mean_ap,
+            'num_images': len(filenames)
+        }
+        print(result)
+        results.append(result)
+    df = pd.DataFrame(results)
+    df.to_csv("all_data_performance.csv")
+    
+    results = []
+    for loader in loaders:
+        map50, mean_ap = test(args, params, model, loader)
+        result = {
+            'txt' 
+        }
     
 @torch.no_grad()
-def test(args, params, model=None):
+def test(args, params, model, validation_loader):
 
     
     
-    # Loading model
-    # Loads if a valid checkpoint is found, otherwise creates a new model
-    model, _, _, starting_epoch = load_checkpoint_for_evaluation(args, params)
+
 
     
 
    
-
-    
-    #Dataloading train
-
-
-    #Dataloading Validation
-    validation_loader, validation_sampler = prepare_loader(args, params,
-                                file_txt=params.get('val_txt'),
-                                img_folder=params.get('val_imgs'),
-                                starting_epoch=starting_epoch
-                                )
 
     # if model is None:
     #     model = torch.load(params.get('best_model_path'), map_location='cuda')['model'].float()

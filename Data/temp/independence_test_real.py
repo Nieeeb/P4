@@ -6,15 +6,11 @@ import torch
 import tqdm
 import torch.distributed as dist
 
-
 # import the single-GPU DAWIDD_HSIC implementation
 from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 from utils import util
 
-class hsic_checkpoint:
-    def __init__(self):
-        pass
 
 def main():
     parser = argparse.ArgumentParser()
@@ -49,82 +45,40 @@ def main():
     )
     sampler = val_loader.sampler
     local_indices = list(sampler)
-    #print(local_indices)
-
-    sampler = val_loader.sampler
-
-    local_indices = list(sampler)  # e.g. [rank, rank+8, rank+16, …] if shuffle=False
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
-    #ckpt = 'Data/temp/latest'
 
     # sampling rate (average clips per day)
     sr = 48 // 48
-    
-    # Loading saved state
-    state_path = 'DAWIDD/i_am_the_hsic_state.pickle'
-    
-    # How often to save
-    save_interval = 10000
-    
-    if os.path.isfile(state_path):
-        state = torch.load(state_path)
-        print(f"Checkpoint found, starting from index {state['index']}")
-    else:
-        print("Checkpoint not found, creating blank state")
 
-        # build detector (single key 'quarterly')
-        detectors = {
-            'HalfHourly': DAWIDD_HSIC(
-                ckpt_path=ckpt,
-                device=args.device,
-                max_window_size=sr,
-                min_window_size=int(0.8 * sr),
-                stride=args.stride,
-                perm_reps=500,
-                perm_batch_size=5
-            )
-        }
+    # build detector (single key 'quarterly')
+    detectors = {
+        'HalfHourly': DAWIDD_HSIC(
+            ckpt_path=ckpt,
+            device=args.device,
+            max_window_size=sr,
+            min_window_size=int(0.8 * sr),
+            stride=args.stride,
+            perm_reps=500,
+            perm_batch_size=5
+        )
+    }
 
-        # grab shared encoder
-        encoder = next(iter(detectors.values())).encoder
-        
-        state = {
-            'index': 0,
-            'detectors': detectors,
-            'encoder': encoder
-        }
-    
-    detectors = state['detectors']
-    encoder = state['encoder']
-    starting_index = state['index']
+    # grab shared encoder
+    encoder = next(iter(detectors.values())).encoder
 
     # processing loop
-
-    for index, (images, _, _) in tqdm.tqdm(enumerate(val_loader), total=len(val_loader), desc="Batches"):
-        if index < starting_index + 1:
-            continue
-        else:
-            images = images.to(args.device).float()
-            with torch.no_grad():
-                z_batch = encoder(images).view(len(images), -1).cpu().numpy()
-            for det in detectors.values():
-                det.add_batch(z_batch)
-                
-            if index % save_interval == 0:
-                state = {
-                    'index': index,
-                    'detectors': detectors,
-                    'encoder': encoder
-                    }
-                torch.save(state, state_path)
-                print(f"Checkpoint saved at index {index}")
+    for images, *_ in tqdm.tqdm(val_loader, total=len(val_loader), desc="Batches"):
+        images = images.to(args.device).float()
+        with torch.no_grad():
+            z_batch = encoder(images).view(len(images), -1).cpu().numpy()
+        for det in detectors.values():
+            det.add_batch(z_batch)
 
     # use the 'quarterly' detector's history
     detector = detectors['quarterly']
     hsic_vals, p_vals = zip(*detector.hsic_history)
-
 
     # build local triplets
     local_triplets = list(zip(local_indices, hsic_vals, p_vals))
@@ -136,7 +90,6 @@ def main():
         gather_list = [None] * world_size
     else:
         gather_list = None
-
     dist.gather_object(local_triplets, gather_list, dst=0)
 
     if rank == 0:

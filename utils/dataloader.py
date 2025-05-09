@@ -4,7 +4,11 @@ from torch.utils import data
 
 warnings.filterwarnings("ignore")
 
-def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_workers=16, shuffle=True):
+def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_workers=16, shuffle=True, chrono_difference=False):
+        
+        train_txt = params.get('train_txt')
+        val_txt = params.get('val_txt')
+        
         #Dataloading train 
         filenames = []
         
@@ -16,7 +20,14 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_wo
         if args.local_rank == 0:
             print(f"Number of files found for {file_txt}: {len(filenames)}")
 
-        dataset = Dataset(filenames, params.get('input_size'), params, augment=params.get('augment'))
+        dataset = Dataset(filenames,
+                        params.get('input_size'), 
+                        params, 
+                        augment=params.get('augment'), 
+                        chrono_difference=chrono_difference,
+                        train_txt=train_txt,
+                        val_txt=val_txt
+                        )
         
         if args.world_size <= 1:
             sampler = None
@@ -25,6 +36,6 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_wo
             sampler.set_epoch(starting_epoch)
         
         loader = data.DataLoader(dataset, params.get('batch_size'), sampler=sampler,
-                                num_workers=num_workers, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False, shuffle=shuffle)
+                                num_workers=num_workers, pin_memory=True, collate_fn=Dataset.collate_fn, drop_last=False)
         
         return loader, sampler
