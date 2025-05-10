@@ -98,10 +98,6 @@ def train_epoch(args, moco_model, optimizer, scheduler, train_loader, train_samp
         del loss # Deletes loss to save memory
         
         optimizer.step() # Steps the optimizer
-        
-        if batchidx > 10:
-            print("broke")
-            break
 
     scheduler.step() # Step learning rate scheduler
     
