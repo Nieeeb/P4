@@ -41,24 +41,23 @@ def main():
         params = yaml.safe_load(f)
         
     #write_inference(args, params)
-    data = add_dates(args, params)
-    print(data.head())
-    monthly_data = group_by_month(data)
+    #data = add_dates(args, params)
+    #print(data.head())
+    #monthly_data = group_by_month(data)
     #distances_from_baseline = calculate_distance_from_baseline(monthly_data, baseline_month=2)
-    distances = calculate_distances(monthly_data)
-    list_form = [d for d in distances.values()]
-    avg = sum(list_form) / len(list_form)
+    #distances = calculate_distances(monthly_data)
+    #list_form = [d for d in distances.values()]
+    #avg = sum(list_form) / len(list_form)
     
-    print(f"Average distance between months: {avg}")
+    #print(f"Average distance between months: {avg}")
     
     #flat = flatten_output(data)
     #flat.to_csv('DAWIDD/flatten_ae.csv')
     flat = pd.read_csv('DAWIDD/flatten_ae.csv', index_col=0, header='infer')
     print(flat.head())
     
-    skip_columns = ['filenames', 'datetime']
+    skip_columns = ['filename', 'datetime']
     selected_columns = [col for col in flat.columns if col not in skip_columns]
-    print(selected_columns)
     #dbscan = DBSCAN(avg,
     #                min_samples=100,
     #                n_jobs=-1,
