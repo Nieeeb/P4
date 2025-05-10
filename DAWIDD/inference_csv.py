@@ -168,8 +168,8 @@ def write_inference(args, params):
     )
 
     # checkpoint path
-    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-    ckpt = 'Data/temp/latest'
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
+    #ckpt = 'Data/temp/latest'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
