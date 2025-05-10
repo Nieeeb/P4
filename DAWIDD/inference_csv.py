@@ -16,6 +16,7 @@ from utils import util
 from nets.autoencoder import ConvAutoencoder
 from sklearn.cluster import DBSCAN, KMeans
 import copy
+import torchvision
 
 def main():
     parser = argparse.ArgumentParser()
@@ -159,16 +160,16 @@ def write_inference(args, params):
     # data loader
     loader, _ = prepare_loader(
         args, params,
-        file_txt=params['val_txt'],
-        img_folder=params['val_imgs'],
+        file_txt=params['train_txt'],
+        img_folder=params['train_imgs'],
         starting_epoch=-1,
         num_workers=16,
         shuffle = False
     )
 
     # checkpoint path
-    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-    #ckpt = 'Data/temp/latest'
+    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
+    ckpt = 'Data/temp/latest'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
@@ -182,7 +183,13 @@ def write_inference(args, params):
     with torch.no_grad():
         for images, *_ in tqdm(loader, total=len(loader), desc="Encoding Batches"):
             images = images.to(args.device).float() / 255
+            
+            resize = torchvision.transforms.Resize((128,128))
+            images = resize(images)
+            
             outputs = model.encode(images)
+            
+            #print(outputs.shape)
             
             for output in outputs:
                 encoding = {
