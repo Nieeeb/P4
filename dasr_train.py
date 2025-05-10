@@ -122,7 +122,9 @@ def train(rank, params, args):
             exit
         
         # Dataloader
-        dataset = GrayscalePatchDataset(patch_size=args['patch_size'])
+        dataset = GrayscalePatchDataset(patch_size=args['patch_size'],
+                                        files_txt=args['train_txt'],
+                                        img_folder=args['img_folder'])
         train_sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=False)
         train_sampler.set_epoch(starting_epoch)
         train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=False, pin_memory=True)
