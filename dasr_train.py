@@ -127,7 +127,7 @@ def train(rank, params, args):
                                         img_folder=args['img_folder'])
         train_sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=False)
         train_sampler.set_epoch(starting_epoch)
-        train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=False, pin_memory=True)
+        train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=False, pin_memory=True, num_workers=32)
 
         loss_fn = torch.nn.CrossEntropyLoss().to(args['local_rank'])
         
