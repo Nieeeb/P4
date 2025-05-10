@@ -40,8 +40,8 @@ def main():
     # data loader
     val_loader, _ = prepare_loader(
         args, params,
-        file_txt=params['train_txt'],
-        img_folder=params['train_imgs'],
+        file_txt=params['val_txt'],
+        img_folder=params['val_imgs'],
         starting_epoch=-1,
         num_workers=16,
         shuffle=False
