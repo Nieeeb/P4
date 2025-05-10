@@ -128,7 +128,7 @@ class DAWIDD_HSIC:
         stripped = {k.replace('module.', ''): v for k, v in raw.items()}
         model.load_state_dict(stripped)
         model.eval()
-        self.encoder = self.model.encoder
+        self.encoder = model.encoder
 
         # sliding-window params
         self.max_window_size = max_window_size
