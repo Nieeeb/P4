@@ -76,7 +76,7 @@ class GrayscalePatchDataset(Dataset):
             return self.transform(img.crop((x, y, x+ps, y+ps)))
         x1, x2 = rand_crop(), rand_crop()
         return x1, x2, self.paths[idx]
-
+    
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
@@ -114,8 +114,6 @@ class Encoder(nn.Module):
 
         return fea, out
 
-
-
 def plot_patch_pairs(loader):
     # Grab a single batch
     x1_batch, x2_batch, paths = next(iter(loader))
@@ -142,11 +140,6 @@ def plot_patch_pairs(loader):
     plt.tight_layout()
     plt.show()
 
-
-
-
-
-
 # Function for defining machine and port to use for DDP
 # Sets up the process group
 def setup(rank, world_size):
@@ -160,58 +153,7 @@ def setup(rank, world_size):
 # Method to gracefully destory the process group
 # If this is not done, problems may arise on future runs
 def cleanup():
-    torch.distributed.destroy_process_group()   
-
-def loss_function(q, k, queue):
-    τ = 0.05
-
-    # N is the batch size
-    N = q.shape[0]
-    
-    # C is the dimensionality of the representations
-    C = q.shape[1]
-
-    # bmm stands for batch matrix multiplication
-    # If mat1 is a b×n×m tensor, mat2 is a b×m×p tensor, 
-    # then output will be a b×n×p tensor. 
-    pos = torch.exp(torch.div(torch.bmm(q.view(N,1,C), k.view(N,C,1)).view(N, 1),τ))
-    
-    # performs matrix multiplication between query and queue tensors
-    neg = torch.sum(torch.exp(torch.div(torch.mm(q.view(N,C), torch.t(queue)),τ)), dim=1)
-    
-    # sum is over positive as well as negative samples
-    denominator = neg + pos
-
-    return torch.mean(-torch.log(torch.div(pos,denominator)))
-
-def create_queue(dataloader, device, model_k, K, batch_size):
-    queue = None
-    flag = 0
-    if queue is None:
-        while True:
-
-            with torch.no_grad():
-                for q, k, _ in tqdm(dataloader, desc="Filling  Queue", total=K/batch_size):            
-
-                    k = k.to(device)
-                    k = model_k(k)
-                    k = k.detach()
-
-                    k = torch.div(k,torch.norm(k,dim=1).reshape(-1,1))
-
-                    if queue is None:
-                        queue = k
-                    else:
-                        if queue.shape[0] < K:
-                            queue = torch.cat((queue, k), 0)    
-                        else:
-                            flag = 1
-                    
-                    if flag == 1:
-                        return queue
-
-            if flag == 1:
-                return queue
+    torch.distributed.destroy_process_group()
 
 def main():
     args = load_args()
@@ -221,7 +163,6 @@ def main():
     sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=False)
     sampler.set_epoch(-1)
     loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=sampler, drop_last=False, pin_memory=True)
-    # plot_patch_pairs(loader)
 
     moco_model = MoCo(Encoder,
                 dim=256, K=args['queue_size'],
@@ -229,98 +170,32 @@ def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     moco_model = moco_model.to(device)
 
+    num_epochs = 1
+    loss_fn = torch.nn.CrossEntropyLoss().cuda()    
+    
     optimizer = torch.optim.Adam(
         moco_model.module.encoder_q.parameters() if isinstance(moco_model, nn.DataParallel) 
         else moco_model.encoder_q.parameters(),
         lr=args['lr'], weight_decay=1e-4
     )
 
-    num_epochs = 1
-    loss_fn = torch.nn.CrossEntropyLoss().cuda()
-    scaler = torch.amp.GradScaler(device=device)
-    
-    # defining our deep learning architecture
-    model_q = resnet18(pretrained=False)
-    model_q.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,bias=False)
-
-    classifier = nn.Sequential(OrderedDict([
-        ('fc1', nn.Linear(model_q.fc.in_features, 100)),
-        ('added_relu1', nn.ReLU(inplace=True)),
-        ('fc2', nn.Linear(100, 50)),
-        ('added_relu2', nn.ReLU(inplace=True)),
-        ('fc3', nn.Linear(50, 25))
-    ]))
-
-    model_q.fc = classifier
-    
-    
-    
-    #model_q = Encoder()
-    model_k = copy.deepcopy(model_q)
-    
-    model_q.to(device)
-    model_k.to(device)
-    
-    queue = create_queue(
-        dataloader=loader,
-        device=device,
-        model_k=model_k,
-        K = args['queue_size'],
-        batch_size=args['batch_size']
-    )
-
     for epoch in range(num_epochs):
         moco_model.train()
         sampler.set_epoch(epoch)
         for q, k, _ in loader:
-            #for i in range(10000):
             optimizer.zero_grad()
             q = q.to(device)
             k = k.to(device)
-            #embeddings, logits, labels = moco_model(im_q, im_k)
-            #print(logits)
-            #print(moco_model.queue.shape)
-
-            q = model_q(q)
-            k = model_k(k)
-            k = k.detach()
+            embeddings, logits, labels = moco_model(q, k)
             
-            # normalize the ouptuts, make them unit vectors
-            q = torch.div(q,torch.norm(q,dim=1).reshape(-1,1))
-            k = torch.div(k,torch.norm(k,dim=1).reshape(-1,1))
-            
-            loss = loss_function(q, k, queue)
+            loss = loss_fn(logits, labels)
             
             loss.backward()
             
-            #loss = loss_fn(logits, labels)
-
-            #scaled_loss = scaler.scale(loss)
-            #loss.backward()
-            #scaled_loss.backward()
             optimizer.step()
-            #scaler.step(optimizer)
-            #scaler.update()
-            
-            # update the queue, adding the batch to it
-            queue = torch.cat((queue, k), 0) 
-
-            # dequeue if the queue gets larger than the max queue size - denoted by K
-            if queue.shape[0] > args['queue_size']:
-                queue = queue[args['batch_size']:,:]
-            
-            # Update model K parameters with momentum
-            for θ_k, θ_q in zip(model_k.parameters(), model_q.parameters()):
-                θ_k.data.copy_(args['momentum']*θ_k.data + θ_q.data*(1.0 - args['momentum']))
-            model_k.eval()
 
             print(loss)
-            #break
 
-
-        
-        
-    
     cleanup()
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import torch
 import torch.nn as nn
+import copy
 
 
 class MoCo(nn.Module):
@@ -24,11 +25,13 @@ class MoCo(nn.Module):
         # create the encoders
         # num_classes is the output fc dimension
         self.encoder_q = base_encoder()
-        self.encoder_k = base_encoder()
+        #self.encoder_k = base_encoder()
+        self.encoder_k = copy.deepcopy(self.encoder_q)
 
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
+        self.encoder_k.eval()
 
         # create the queue
         self.register_buffer("queue", torch.randn(dim, K))
@@ -43,6 +46,7 @@ class MoCo(nn.Module):
         """
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
+        #self.encoder_k.eval()
 
     @torch.no_grad()
     def _dequeue_and_enqueue(self, keys):
