@@ -52,7 +52,7 @@ def main():
     print(f"Average distance between months: {avg}")
     
     flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten.csv')
+    flat.to_csv('DAWIDD/flatten_ae.csv')
     print(flat.head())
     
     skip_columns = ['filenames', 'datetime']
@@ -65,18 +65,18 @@ def main():
     kmeans = KMeans(n_clusters=20,
                     random_state=0
                     ).fit(flat[selected_columns])
-    torch.save(kmeans, "DAWIDD/kmeans.pickle")
+    torch.save(kmeans, "DAWIDD/kmeans_ae.pickle")
     clusterings = kmeans.predict(flat[selected_columns])
     
     print(clusterings)
-    torch.save(clusterings, "DAWIDD/clusterings.pickle")
+    torch.save(clusterings, "DAWIDD/clusterings_ae.pickle")
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_train.pickle')
+    df = torch.load('DAWIDD/encodings_ae_train.pickle')
     
     filenames = pd.Series(get_txt(file_txt=params['train_txt'],
                         img_folder=params['train_imgs']))
@@ -198,8 +198,8 @@ def write_inference(args, params):
                 encodings.append(encoding)
     
     df = pd.DataFrame(encodings)
-    #df.to_csv('DAWIDD/encodings_valid_local.csv')
-    torch.save(df, 'DAWIDD/encodings_valid_local.pickle')
+    #df.to_csv('DAWIDD/encodings_train.csv')
+    torch.save(df, 'DAWIDD/encodings_ae_train.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):
