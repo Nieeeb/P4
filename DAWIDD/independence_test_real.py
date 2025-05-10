@@ -51,11 +51,11 @@ def main():
     #print(local_indices)
 
     # checkpoint path
-    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_1/100'
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
     #ckpt = 'Data/temp/latest'
 
     # sampling rate (average clips per day)
-    sr = 48 // 48
+    sr = 24
     
     # Loading saved state
     state_path = 'DAWIDD/i_am_the_hsic_state.pickle'
@@ -75,8 +75,8 @@ def main():
                 ckpt_path=ckpt,
                 device=args.device,
                 max_window_size=sr,
-                min_window_size=int(0.8 * sr),
-                stride=args.stride,
+                min_window_size=sr - 5,
+                stride=9,
                 perm_reps=500,
                 perm_batch_size=5
             )

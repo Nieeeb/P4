@@ -119,13 +119,16 @@ class DAWIDD_HSIC:
             device = 'cuda:0'
         self.device = torch.device(device)
 
-        # load model
-        self.model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
-        ckpt = torch.load(ckpt_path, map_location=self.device)
+        
+        #ckpt = 'Data/temp/latest'
+        
+
+        model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
+        ckpt = torch.load(ckpt, map_location=device)
         raw = ckpt.get('model', ckpt)
         stripped = {k.replace('module.', ''): v for k, v in raw.items()}
-        self.model.load_state_dict(stripped)
-        self.model.eval()
+        model.load_state_dict(stripped)
+        model.eval()
         self.encoder = self.model.encoder
 
         # sliding-window params
