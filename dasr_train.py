@@ -147,6 +147,7 @@ def train(rank, params, args):
             })
         
         # Pauses all worker threads to sync up GPUs before training
+        print(f"GPU {args['local_rank']} is ready")
         torch.distributed.barrier()
         
         # Begin training
