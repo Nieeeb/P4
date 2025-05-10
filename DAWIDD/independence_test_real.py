@@ -116,7 +116,7 @@ def main():
                 print(f"Checkpoint saved at index {index}")
 
     # use the 'quarterly' detector's history
-    detector = detectors['quarterly']
+    detector = detectors['daily']
     hsic_vals, p_vals = zip(*detector.hsic_history)
 
     # build local triplets
