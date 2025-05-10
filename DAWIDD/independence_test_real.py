@@ -71,7 +71,7 @@ def main():
 
         # build detector (single key 'quarterly')
         detectors = {
-            'HalfHourly': DAWIDD_HSIC(
+            'Daily': DAWIDD_HSIC(
                 ckpt_path=ckpt,
                 device=args.device,
                 max_window_size=sr,
