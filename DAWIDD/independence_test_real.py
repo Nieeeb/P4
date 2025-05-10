@@ -55,7 +55,7 @@ def main():
     #ckpt = 'Data/temp/latest'
 
     # sampling rate (average clips per day)
-    sr = 24 * 7
+    sr = 24 * 30
     
     # Loading saved state
     state_path = 'DAWIDD/i_am_the_hsic_state.pickle'
@@ -71,7 +71,7 @@ def main():
 
         # build detector (single key 'quarterly')
         detectors = {
-            'Weekly': DAWIDD_HSIC(
+            'Monthly': DAWIDD_HSIC(
                 ckpt_path=ckpt,
                 device=args.device,
                 max_window_size=sr,
