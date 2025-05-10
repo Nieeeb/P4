@@ -170,7 +170,7 @@ def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     moco_model = moco_model.to(device)
 
-    num_epochs = 1
+    num_epochs = 10
     loss_fn = torch.nn.CrossEntropyLoss().cuda()    
     
     optimizer = torch.optim.Adam(
@@ -194,7 +194,7 @@ def main():
             
             optimizer.step()
 
-            print(loss)
+            print(f"Epoch: {epoch +1}, loss: {loss.item()}")
 
     cleanup()
 
