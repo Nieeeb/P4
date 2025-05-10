@@ -15,7 +15,7 @@ import torch.nn.functional as F
 import numpy
 import argparse
 import yaml
-from Moco import MoCo
+from MoCo.Moco import MoCo
 import copy
 from torchvision.models import resnet18
 from collections import OrderedDict
@@ -61,7 +61,10 @@ class GrayscalePatchDataset(Dataset):
                 self.paths.append(img_folder + filename) 
                 
         self.patch_size = patch_size
-        self.transform = transforms.Compose([transforms.ToTensor()]) #gør billeder til tensor
+        self.transform = transforms.Compose([transforms.ToTensor(),
+                                            transforms.RandomVerticalFlip(),
+                                            transforms.RandomHorizontalFlip()
+                                            ]) #gør billeder til tensor
 
     def __len__(self): return len(self.paths)
 
@@ -69,13 +72,14 @@ class GrayscalePatchDataset(Dataset):
         img = Image.open(self.paths[idx]).convert('L')
         W, H = img.size
         ps = self.patch_size
-
-        def rand_crop():
-            x = random.randint(0, W-ps)
-            y = random.randint(0, H-ps)
-            return self.transform(img.crop((x, y, x+ps, y+ps)))
-        x1, x2 = rand_crop(), rand_crop()
+        
+        x1, x2 = self.rand_crop(img, W, H, ps), self.rand_crop(img, W, H, ps)
         return x1, x2, self.paths[idx]
+    
+    def rand_crop(self, img, W, H, ps):
+        x = random.randint(0, W-ps)
+        y = random.randint(0, H-ps)
+        return self.transform(img.crop((x, y, x+ps, y+ps)))
     
 class Encoder(nn.Module):
     def __init__(self):
@@ -178,7 +182,7 @@ def main():
         else moco_model.encoder_q.parameters(),
         lr=args['lr'], weight_decay=1e-4
     )
-
+    #plot_patch_pairs(loader)
     for epoch in range(num_epochs):
         moco_model.train()
         sampler.set_epoch(epoch)
@@ -186,6 +190,7 @@ def main():
             optimizer.zero_grad()
             q = q.to(device)
             k = k.to(device)
+
             embeddings, logits, labels = moco_model(q, k)
             
             loss = loss_fn(logits, labels)

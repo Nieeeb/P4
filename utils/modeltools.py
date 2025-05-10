@@ -6,6 +6,8 @@ from nets.nn import yolo_v8_m
 from nets.autoencoder import ConvAutoencoder
 from collections import OrderedDict
 import cv2
+from MoCo.Moco import MoCo
+from MoCo.Dataset import Encoder
 
 # Method for saving trainign state to a given path
 # Path should be a folder
@@ -90,7 +92,87 @@ def load_or_create_state(args, params):
             
         return model, optimizer, scheduler, starting_epoch
 
+# Method for saving trainign state to a given path
+# Path should be a folder
+def save_checkpoint_dasr(model: MoCo, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.LRScheduler, epoch: int, path: str):
+    state_dict ={
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'scheduler': scheduler.state_dict(),
+        'epoch': epoch,
+    }
+    if not Path(path).exists():
+        parent = os.path.dirname(path)
+        if not Path(parent).exists():
+            os.mkdir(parent)
+        os.mkdir(path)
+    
+    # Save a state with current epoch number
+    torch.save(state_dict, os.path.join(path, f"{epoch}"))
+    
+    # Save a copy as "latest" for easy reloading
+    torch.save(state_dict, os.path.join(path, "latest"))
 
+# Method for loading the latest checkpoint from a folder
+# Path should be a folder containing state dicts
+def load_latest_dasr(path: str, args): #-> Tuple[torch.nn.Module | torch.nn.parallel.DistributedDataParallel, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler, int]:
+    assert Path(path).exists()
+    state_path = os.path.join(path, 'latest')
+    state_dict = torch.load(state_path, weights_only=False)
+
+    model = MoCo(Encoder,
+            dim=args['dim'],
+            K=args['queue_size'],
+            m=args['momentum'],
+            T=args['temperature']
+            ).cuda()
+    model = torch.nn.parallel.DistributedDataParallel(model)
+    model.load_state_dict(state_dict=state_dict['model'])
+    model.to(args['local_rank'])
+        
+    optimizer = torch.optim.Adam(
+                            model.module.encoder_q.parameters(),
+                            lr=args['lr'], weight_decay=args['weight_decay']
+                            )
+    optimizer.load_state_dict(state_dict['optimizer'])
+    model.to(args['local_rank'])
+    
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args['step_size'], last_epoch=-1)
+    scheduler.load_state_dict(state_dict['scheduler'])
+    model.to(args['local_rank'])
+    
+    epoch = state_dict['epoch']
+    
+    return model, optimizer, scheduler, epoch
+
+# Given a path, first checks if a checkpoint is already saved
+# If no checkpoint is found, a new model, optimizer, and scheduler are created
+def load_or_create_dasr(args):
+        checkpoint_path = args['checkpoint_path']
+        starting_epoch = 0
+        if check_checkpoint(checkpoint_path):
+            model, optimizer, scheduler, starting_epoch = load_latest_dasr(checkpoint_path, args)
+            print(f"Checkpoint found, starting from epoch {starting_epoch + 1}")
+        else:
+            print("No checkpoint found, starting new training")
+            starting_epoch = 0
+            
+            model = MoCo(Encoder,
+                        dim=args['dim'],
+                        K=args['queue_size'],
+                        m=args['momentum'],
+                        T=args['temperature']
+                        ).cuda()
+            model = torch.nn.parallel.DistributedDataParallel(model)
+            model = model.to(args['local_rank'])
+
+            optimizer = torch.optim.Adam(
+                            model.module.encoder_q.parameters(),
+                            lr=args['lr'], weight_decay=args['weight_decay']
+                            )
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args['step_size'], last_epoch=-1)
+            
+        return model, optimizer, scheduler, starting_epoch
 
 def load_checkpoint_for_evaluation(args, params):
     checkpoint_path = params.get('checkpoint_path')

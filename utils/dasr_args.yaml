@@ -1,24 +1,17 @@
-checkpoint_path: "runs/yolo_m_testing"  # Path to save model checkpoints
+checkpoint_path: "runs/dasr_testing"  # Path to save model checkpoints
+
 train_imgs: "Data/images/train/"
 train_txt: "Data/train.txt"
-val_imgs: "Data/images/valid/"
-val_txt: "Data/valid.txt"
-epochs: 100                 # Number of epochs to train
-patch_size: 256              # Batch size for data loading
-input_size: 384 #384             # Input size of images
-run_name: "yolo_m_testing"        # Name of the run for wandb loggin
 
-queue_size: 2050
+epochs: 100                 # Number of epochs to train
+run_name: "dasr_testing"        # Name of the run for wandb loggin
+
+queue_size: 40
 temperature: 0.999
 momentum: 0.07
-lr: 0.001
-batch_size: 100
-
-
-best_model_epoch: "9"
-# classes
-names:
-  0: person
-  1: bicycle
-  2: car
-  3: motorcycle
+lr: 0.1
+weight_decay: 0.001
+batch_size: 20
+patch_size: 256 
+dim: 256
+step_size: 10
