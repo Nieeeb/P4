@@ -31,7 +31,7 @@ class MoCo(nn.Module):
         for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
-        self.encoder_k.eval()
+        #self.encoder_k.eval()
 
         # create the queue
         self.register_buffer("queue", torch.randn(dim, K))
