@@ -121,9 +121,9 @@ def train(rank, params, args):
         dataset = GrayscalePatchDataset(patch_size=args['patch_size'],
                                         files_txt=args['train_txt'],
                                         img_folder=args['train_imgs'])
-        train_sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=False)
+        train_sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=True)
         train_sampler.set_epoch(starting_epoch)
-        train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=False, pin_memory=True, num_workers=args['num_workers'])
+        train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=True, pin_memory=True, num_workers=args['num_workers'])
 
         loss_fn = torch.nn.CrossEntropyLoss().to(args['local_rank'])
         
