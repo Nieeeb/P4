@@ -119,11 +119,8 @@ class DAWIDD_HSIC:
             device = 'cuda:0'
         self.device = torch.device(device)
 
-        
-        #ckpt = 'Data/temp/latest'
-        ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-        model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
-        ckpt = torch.load(ckpt, map_location=device)
+        model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
+        ckpt = torch.load(ckpt_path, map_location=device)
         raw = ckpt.get('model', ckpt)
         stripped = {k.replace('module.', ''): v for k, v in raw.items()}
         model.load_state_dict(stripped)

@@ -5,19 +5,16 @@ import pandas as pd
 import torch
 import tqdm
 import torch.distributed as dist
+import torchvision
 
 # import the single-GPU DAWIDD_HSIC implementation
 from DAWIDD_HSIC_PARRALEL_TEST import DAWIDD_HSIC
 from utils.dataloader import prepare_loader
 from utils import util
 
-class hsic_checkpoint:
-    def __init__(self):
-        pass
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--args_file', type=str, default='utils/args.yaml',
+    parser.add_argument('--args_file', type=str, default='utils/hsic_args.yaml',
                         help="YAML file with data paths & loader params")
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--stride', type=int, default=3,
@@ -61,7 +58,7 @@ def main():
     state_path = 'DAWIDD/i_am_the_hsic_state.pickle'
     
     # How often to save
-    save_interval = 10000
+    save_interval = 100
     
     if os.path.isfile(state_path):
         state = torch.load(state_path)
@@ -95,54 +92,65 @@ def main():
     encoder = state['encoder']
     starting_index = state['index']
 
-    # processing loop
-    for index, (images, _, _) in tqdm.tqdm(enumerate(val_loader), total=len(val_loader), desc="Batches"):
-        if index < starting_index + 1:
-            continue
-        else:
-            images = images.to(args.device).float()
-            with torch.no_grad():
-                z_batch = encoder(images).view(len(images), -1).cpu().numpy()
-            for det in detectors.values():
-                det.add_batch(z_batch)
+    resize = torchvision.transforms.Resize((128,128))
+    
+    with torch.no_grad():
+        # processing loop
+        for index, (images, _, _) in tqdm.tqdm(enumerate(val_loader), total=len(val_loader), desc="Batches"):
+            if index < starting_index:
+                continue
+            else:
+                images = images.to(args.device).float() / 255
+                #print(images)
+                images = resize(images)
                 
-            if index % save_interval == 0:
-                state = {
-                    'index': index,
-                    'detectors': detectors,
-                    'encoder': encoder
-                    }
-                torch.save(state, state_path)
-                print(f"Checkpoint saved at index {index}")
+                for image in images:
+                    z_batch = encoder(images).view(len(images), -1).cpu().numpy()
+                
+                    for det in detectors.values():
+                        det.add_batch(z_batch)
+                    
+                if index % save_interval == 0:
+                    state = {
+                        'index': index,
+                        'detectors': detectors,
+                        'encoder': encoder
+                        }
+                    torch.save(state, state_path)
+                    print(f"Checkpoint saved at index {index}")
 
     # use the 'quarterly' detector's history
     detector = detectors['Daily']
     hsic_vals, p_vals = zip(*detector.hsic_history)
+    
+    print(f"idx: {len(local_indices)}")
+    print(f"hscic: {len(hsic_vals)}")
+    print(f"pval: {len(p_vals)}")
 
     # build local triplets
-    local_triplets = list(zip(local_indices, hsic_vals, p_vals))
+    #local_triplets = list(zip(local_indices, hsic_vals, p_vals))
 
     # distributed gather
-    world_size = dist.get_world_size()
-    rank = dist.get_rank()
-    if rank == 0:
-        gather_list = [None] * world_size
-    else:
-        gather_list = None
-    dist.gather_object(local_triplets, gather_list, dst=0)
+    #world_size = dist.get_world_size()
+    #rank = dist.get_rank()
+    #if rank == 0:
+    #gather_list = [None] * world_size
+    #else:
+    #    gather_list = None
+    #dist.gather_object(local_triplets, gather_list, dst=0)
 
-    if rank == 0:
+    #if rank == 0:
         # flatten, sort, and save
-        full = [t for per_rank in gather_list for t in per_rank]
-        full.sort(key=lambda x: x[0])
-        idxs, hsics, ps = zip(*full)
-        df = pd.DataFrame({
-            'sample_index': idxs,
-            'hsic_val': hsics,
-            'p_value': ps
+        #full = [t for per_rank in gather_list for t in per_rank]
+        #full.sort(key=lambda x: x[0])
+    #idxs, hsics, ps = zip(*full)
+    df = pd.DataFrame({
+            'sample_index': local_indices,
+            'hsic_val': hsic_vals,
+            'p_value': p_vals
         })
-        df.to_csv('all_ranks_hsic.csv', index=False)
-        print(f"Wrote all_ranks_hsic.csv ({len(df)} rows)")
+    df.to_csv('all_ranks_hsic.csv', index=False)
+    print(f"Wrote all_ranks_hsic.csv ({len(df)} rows)")
 
 
 if __name__ == '__main__':
