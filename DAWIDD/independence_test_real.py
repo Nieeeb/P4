@@ -127,7 +127,7 @@ def main():
                 for det in detectors.values():
                     det.add_batch(z_batch)
                     
-                if index % save_interval == 0:
+                if index % save_interval == 0 and index != starting_index:
                     state = {
                         'index': index,
                         'detectors': detectors,
