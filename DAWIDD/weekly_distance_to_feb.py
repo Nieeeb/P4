@@ -231,7 +231,7 @@ def main():
     print("Saved all distances to february_to_weekly_distance_1.txt")
 
 def add_dates(args, params):
-    df = pd.read_csv('flatten_ae.csv', index_col=0)
+    df = pd.read_csv('DAWIDD/flatten_ae.csv', index_col=0)
     df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     filenames = pd.Series(get_txt(file_txt=params['train_txt'],
