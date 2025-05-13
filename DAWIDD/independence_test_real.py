@@ -49,7 +49,7 @@ def main():
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-    #ckpt = 'Data/temp/latest'
+    #ckpt = 'Data/temp/50'
 
     # sampling rate (average clips per day)
     sr = 24 * 1
@@ -73,6 +73,24 @@ def main():
                 device=args.device,
                 max_window_size=sr,
                 min_window_size=sr - 5,
+                stride=9,
+                perm_reps=500,
+                perm_batch_size=5
+            ),
+            'Weekly': DAWIDD_HSIC(
+                ckpt_path=ckpt,
+                device=args.device,
+                max_window_size=(sr * 7),
+                min_window_size=(sr * 7) - 5,
+                stride=9,
+                perm_reps=500,
+                perm_batch_size=5
+            ),
+            'Monthly': DAWIDD_HSIC(
+                ckpt_path=ckpt,
+                device=args.device,
+                max_window_size=(sr * 30),
+                min_window_size=(sr * 30) - 5,
                 stride=9,
                 perm_reps=500,
                 perm_batch_size=5
@@ -104,11 +122,10 @@ def main():
                 #print(images)
                 images = resize(images)
                 
-                for image in images:
-                    z_batch = encoder(images).view(len(images), -1).cpu().numpy()
+                z_batch = encoder(images).view(len(images), -1).cpu().numpy()
                 
-                    for det in detectors.values():
-                        det.add_batch(z_batch)
+                for det in detectors.values():
+                    det.add_batch(z_batch)
                     
                 if index % save_interval == 0:
                     state = {
@@ -118,14 +135,16 @@ def main():
                         }
                     torch.save(state, state_path)
                     print(f"Checkpoint saved at index {index}")
+                    
 
     # use the 'quarterly' detector's history
-    detector = detectors['Daily']
-    hsic_vals, p_vals = zip(*detector.hsic_history)
+    #detector = detectors['Daily', 'Ẅeekly', 'Monthly']
+    for period, detector in detectors.items():
+        hsic_vals, p_vals = zip(*detector.hsic_history)
     
-    print(f"idx: {len(local_indices)}")
-    print(f"hscic: {len(hsic_vals)}")
-    print(f"pval: {len(p_vals)}")
+        print(f"idx: {len(local_indices)}")
+        print(f"hscic: {len(hsic_vals)}")
+        print(f"pval: {len(p_vals)}")
 
     # build local triplets
     #local_triplets = list(zip(local_indices, hsic_vals, p_vals))
@@ -144,13 +163,13 @@ def main():
         #full = [t for per_rank in gather_list for t in per_rank]
         #full.sort(key=lambda x: x[0])
     #idxs, hsics, ps = zip(*full)
-    df = pd.DataFrame({
-            'sample_index': local_indices,
-            'hsic_val': hsic_vals,
-            'p_value': p_vals
-        })
-    df.to_csv('all_ranks_hsic.csv', index=False)
-    print(f"Wrote all_ranks_hsic.csv ({len(df)} rows)")
+        df = pd.DataFrame({
+                'sample_index': local_indices,
+                'hsic_val': hsic_vals,
+                'p_value': p_vals
+            })
+        df.to_csv(f'{period}_ranks_hsic.csv', index=False)
+        print(f"Wrote {period}_ranks_hsic.csv ({len(df)} rows)")
 
 
 if __name__ == '__main__':
