@@ -1,18 +1,16 @@
 import pandas as pd
-#from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-import cudf
-from cuml.cluster import KMeans
 from collections import defaultdict
 import random
 
 class DataClusterer():
     def __init__(self, K, data):
-        self.kmeans = KMeans(n_clusters=K,
+        self.kmeans = KMeans(
+                    n_clusters=K,
                     random_state=0,
                     n_init=10,
-                    init='scalable-k-means++'
                 )
         self.kmeans.fit(data)
         
@@ -22,26 +20,25 @@ class DataClusterer():
     
 def elbow_test_kmeans(data, max_clusters):
     random_state = 0
-    rss_list = []
+    sse_list = []
     
     for k in tqdm(range(1, max_clusters), desc="Fitting Cluster Sizes", total=max_clusters):
         kmeans = KMeans(n_clusters=k,
                         random_state=random_state,
-                        n_init=10,
-                        init='scalable-k-means++'
+                        n_init=10
                         )
         kmeans.fit(data)
-        rss = kmeans.score(data)
-        rss_list.append(rss)
+        sse = kmeans.inertia_
+        sse_list.append(sse)
     
-    print(rss_list)
-    plt.plot(range(1, max_clusters), rss_list)
+    print(sse_list)
+    plt.plot(range(1, max_clusters), sse_list)
     plt.xticks(range(1, max_clusters))
     plt.xlabel("Number of Clusters (K)")
-    plt.ylabel("RSS")
-    plt.title("RSS versus K")
+    plt.ylabel("SSE")
+    plt.title("SSE versus K")
     plt.grid()
-    plt.savefig("elbow_test_rss.png")
+    plt.savefig("elbow_test_SSE.png")
     plt.show()
 
 def write_cluster_txts(data: pd.DataFrame):
@@ -61,8 +58,6 @@ def write_cluster_txts(data: pd.DataFrame):
 def main():
     path = "DAWIDD/flatten_ae.csv"
     data = pd.read_csv(path, index_col=0)
-    data = cudf.read_csv(path, index_col=0)
-    data = cudf.from_pandas(data)
     skip_columns = ['filename', 'datetime']
     selected_columns = [col for col in data.columns if col not in skip_columns]
     x = data[selected_columns]
