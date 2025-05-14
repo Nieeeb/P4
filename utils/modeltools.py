@@ -8,6 +8,7 @@ from collections import OrderedDict
 import cv2
 from MoCo.Moco import MoCo
 from MoCo.Dataset import Encoder
+import copy
 
 # Method for saving trainign state to a given path
 # Path should be a folder
@@ -91,6 +92,77 @@ def load_or_create_state(args, params):
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
             
         return model, optimizer, scheduler, starting_epoch
+
+def load_latest_clusters(path: str):
+    assert Path(path).exists()
+    state_path = os.path.join(path, 'latest')
+    states = torch.load(state_path, weights_only=False)
+    return states
+
+def load_current_cluster(states):
+    current_cluster = states['current_cluster']
+    model = yolo_v8_m(num_classes=4).cuda()
+    model = torch.nn.parallel.DistributedDataParallel(model)
+    model.load_state_dict(state_dict=states['clusters'][current_cluster]['model'])
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer.load_state_dict(state_dict=states['clusters'][current_cluster]['optimizer'])
+    
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
+    scheduler.load_state_dict(state_dict=states['clusters'][current_cluster]['scheduler'])
+    
+    epoch = states['clusters'][current_cluster]['epoch']
+    
+    return model, optimizer, scheduler, epoch
+        
+        
+    states = {
+        'clusters': None,
+        'current_cluster': None
+    }
+    state = {
+        'model': None,
+        'optimizer': None,
+        'scheduler': None,
+        'epoch': None
+    }
+    
+    
+
+def load_or_create_cluster(args, params):
+    n_clusters = params['n_clusters']
+    checkpoint_path = params.get('checkpoint_path')
+    starting_epoch = 0
+    if check_checkpoint(checkpoint_path):
+        states = load_latest_clusters(checkpoint_path)
+        print(f"Checkpoint found, starting from epoch {starting_epoch + 1}")
+    else:
+        print("No checkpoint found, starting new training")
+        starting_epoch = 0
+        states = {
+            'clusters': [],
+            'current_cluster': 0
+        }
+        
+        base_model = yolo_v8_m(num_classes=len(params['names'])).cuda()
+        base_model = torch.nn.parallel.DistributedDataParallel(base_model)
+        
+        base_optimizer = torch.optim.Adam(base_model.parameters(), lr=0.001)
+        
+        base_scheduler = torch.optim.lr_scheduler.StepLR(base_optimizer, step_size=10, last_epoch=-1)
+        
+        for cluster in range(n_clusters):
+            state = {
+            'model': copy.deepcopy(base_model.state_dict()),
+            'optimizer': copy.deepcopy(base_optimizer.state_dict()),
+            'scheduler': copy.deepcopy(base_scheduler.state_dict()),
+            'epoch': 0
+            }
+            states['clusters'].append(state)
+        
+        
+    
+
 
 # Method for saving trainign state to a given path
 # Path should be a folder
