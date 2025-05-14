@@ -136,7 +136,7 @@ def main():
                     torch.save(state, state_path)
                     print(f"Checkpoint saved at index {index}")
                     
-    torch.save(detector, "DAWIDD/complete_hsic.pickle")
+    torch.save(detectors, "DAWIDD/complete_hsic.pickle")
     # use the 'quarterly' detector's history
     #detector = detectors['Daily', 'Ẅeekly', 'Monthly']
     for period, detector in detectors.items():
