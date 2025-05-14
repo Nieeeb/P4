@@ -4,7 +4,7 @@ from torch.utils import data
 
 warnings.filterwarnings("ignore")
 
-def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_workers=16, shuffle=True, chrono_difference=False):
+def prepare_loader(args, params, file_txt, img_folder, cache_path_override = None, starting_epoch=-1, num_workers=16, shuffle=True, chrono_difference=False):
         
         train_txt = params.get('train_txt')
         val_txt = params.get('val_txt')
@@ -26,7 +26,8 @@ def prepare_loader(args, params, file_txt, img_folder, starting_epoch=-1, num_wo
                         augment=params.get('augment'), 
                         chrono_difference=chrono_difference,
                         train_txt=train_txt,
-                        val_txt=val_txt
+                        val_txt=val_txt,
+                        cache_path_override=cache_path_override
                         )
         
         if args.world_size <= 1:

@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 def main(): 
     #Loading args from CLI
     parser = argparse.ArgumentParser()
-    parser.add_argument('--args_file', default='utils/args.yaml', type=str)
+    parser.add_argument('--args_file', default='utils/ae_args.yaml', type=str)
     parser.add_argument('--world_size', default=1, type=int)
 
     args = parser.parse_args()

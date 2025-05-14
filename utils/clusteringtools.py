@@ -49,30 +49,37 @@ def write_cluster_txts(data: pd.DataFrame):
         txt_files[row['cluster']].append(row['filename'])
     
     for cluster, file_names in tqdm(txt_files.items(), desc="Writing .txts from clusters", total=len(txt_files)):
-        path = f"Data/train_ae_cluster_{cluster}.txt"
-        file_names = random.shuffle(file_names)
+        path = f"Data/febtrain_ae_cluster_{cluster}.txt"
+        random.shuffle(file_names)
         with open(path, 'w') as f:
             for file in file_names:
                 f.write(file + "\n")
 
-def main():
-    path = "DAWIDD/flatten_ae.csv"
-    data = pd.read_csv(path, index_col=0)
+def main():               
+    train_path = "DAWIDD/flatten_ae_febtrain.csv"
+    data = pd.read_csv(train_path, index_col=0)
+    print(data.head())
     skip_columns = ['filename', 'datetime']
     selected_columns = [col for col in data.columns if col not in skip_columns]
     x = data[selected_columns]
     
+    val_path = "DAWIDD/flatten_ae_febvalid.csv"
+    val_data = pd.read_csv(val_path, index_col=0)
+    val_x = val_data[selected_columns]
+    
     # tests looks like 10 or 11 clusters might be right
-    elbow_test_kmeans(x, 30)
+    #elbow_test_kmeans(x, 30)
     cluster_alg = DataClusterer(K=11, data=x)
     
-    predictions = cluster_alg.predict_cluster(x)
+    train_predictions = cluster_alg.predict_cluster(x)
+    val_predictions = cluster_alg.predict_cluster(val_x)
     
-    data['cluster'] = predictions
+    data['cluster'] = train_predictions
+    data.to_csv("DAWIDD/flatten_ae_febtrain_with_clusters.csv")
+    val_data['cluster'] = val_predictions
+    val_data.to_csv("DAWIDD/flatten_ae_febval_with_clusters.csv")
+    
     print(data.head())
-    data.to_csv("DAWIDD/flatten_ae_with_clusters.csv")
-    
-    data = pd.read_csv("DAWIDD/flatten_ae_with_clusters.csv", index_col=0)
     write_cluster_txts(data)
 
 if __name__ == '__main__':

@@ -99,6 +99,29 @@ def load_latest_clusters(path: str):
     states = torch.load(state_path, weights_only=False)
     return states
 
+def save_current_cluster(states: dict, path: str, model: torch.nn.Module, optimizer: torch.optim.Adam, scheduler: torch.optim.lr_scheduler.StepLR, epoch: int):
+    current_cluster = states['current_cluster']
+    state = {
+        'model': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'scheduler': scheduler.state_dict(),
+        'epoch': epoch
+    }
+    
+    states['clusters'][current_cluster] = state
+    
+    if not Path(path).exists():
+        parent = os.path.dirname(path)
+        if not Path(parent).exists():
+            os.mkdir(parent)
+        os.mkdir(path)
+    
+    # Save a state with current epoch number
+    torch.save(states, os.path.join(path, f"cluster_{current_cluster}_epoch_{epoch + 1}"))
+    
+    # Save a copy as "latest" for easy reloading
+    torch.save(states, os.path.join(path, "latest"))
+
 def load_current_cluster(states):
     current_cluster = states['current_cluster']
     model = yolo_v8_m(num_classes=4).cuda()
@@ -129,16 +152,14 @@ def load_current_cluster(states):
     
     
 
-def load_or_create_cluster(args, params):
+def load_or_create_clusters(args, params):
     n_clusters = params['n_clusters']
     checkpoint_path = params.get('checkpoint_path')
-    starting_epoch = 0
     if check_checkpoint(checkpoint_path):
         states = load_latest_clusters(checkpoint_path)
-        print(f"Checkpoint found, starting from epoch {starting_epoch + 1}")
+        print(f"Checkpoint found, starting from cluster {states['current_cluster']}\nStarting from epoch {states['clusters'][states['current_cluster']]['epoch'] + 1}")
     else:
         print("No checkpoint found, starting new training")
-        starting_epoch = 0
         states = {
             'clusters': [],
             'current_cluster': 0
@@ -159,10 +180,8 @@ def load_or_create_cluster(args, params):
             'epoch': 0
             }
             states['clusters'].append(state)
-        
-        
     
-
+    return states
 
 # Method for saving trainign state to a given path
 # Path should be a folder

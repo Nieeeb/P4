@@ -20,7 +20,7 @@ import torchvision
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--args_file', type=str, default='utils/ae_args.yaml',
+    parser.add_argument('--args_file', type=str, default='utils/args.yaml',
                         help="YAML file with data paths & loader params")
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--stride', type=int, default=3,
@@ -40,9 +40,10 @@ def main():
     with open(args.args_file) as f:
         params = yaml.safe_load(f)
         
-    #write_inference(args, params)
-    #data = add_dates(args, params)
-    #print(data.head())
+    write_inference(args, params)
+    data = add_dates(args, params)
+    print(data.head())
+    
     #monthly_data = group_by_month(data)
     #distances_from_baseline = calculate_distance_from_baseline(monthly_data, baseline_month=2)
     #distances = calculate_distances(monthly_data)
@@ -51,33 +52,17 @@ def main():
     
     #print(f"Average distance between months: {avg}")
     
-    #flat = flatten_output(data)
-    #flat.to_csv('DAWIDD/flatten_ae.csv')
-    flat = pd.read_csv('DAWIDD/flatten_ae.csv', index_col=0, header='infer')
+    flat = flatten_output(data)
+    flat.to_csv('DAWIDD/flatten_ae_febtrain.csv')
+    flat = pd.read_csv('DAWIDD/flatten_ae_febtrain.csv', index_col=0, header='infer')
     print(flat.head())
-    
-    skip_columns = ['filename', 'datetime']
-    selected_columns = [col for col in flat.columns if col not in skip_columns]
-    #dbscan = DBSCAN(avg,
-    #                min_samples=100,
-    #                n_jobs=-1,
-    #                metric='euclidean'
-    #                ).fit(flat[selected_columns])
-    kmeans = KMeans(n_clusters=20,
-                    random_state=0
-                    ).fit(flat[selected_columns])
-    torch.save(kmeans, "DAWIDD/kmeans_ae.pickle")
-    clusterings = kmeans.predict(flat[selected_columns])
-    
-    print(clusterings)
-    torch.save(clusterings, "DAWIDD/clusterings_ae.pickle")
     
 def add_dates(args, params):
     #df = pd.read_csv('DAWIDD/encodings_train_local.csv', index_col=0)
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_ae_train.pickle')
+    df = torch.load('DAWIDD/encodings_ae_febtrain.pickle')
     
     filenames = pd.Series(get_txt(file_txt=params['train_txt'],
                         img_folder=params['train_imgs']))
@@ -170,7 +155,7 @@ def write_inference(args, params):
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-    #ckpt = 'Data/temp/latest'
+    ckpt = 'Data/temp/50'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
@@ -200,7 +185,7 @@ def write_inference(args, params):
     
     df = pd.DataFrame(encodings)
     #df.to_csv('DAWIDD/encodings_train.csv')
-    torch.save(df, 'DAWIDD/encodings_ae_train.pickle')
+    torch.save(df, 'DAWIDD/encodings_ae_febtrain.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):

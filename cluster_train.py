@@ -5,7 +5,7 @@ import warnings
 import torch
 from utils import util
 import wandb
-from utils.modeltools import save_checkpoint, load_current_cluster, load_or_create_cluster
+from utils.modeltools import save_current_cluster, load_current_cluster, load_or_create_clusters
 import torch.multiprocessing as mp
 from datetime import timedelta
 from utils.dataloader import prepare_loader
@@ -21,7 +21,6 @@ def main():
 
     args = parser.parse_args()
 
-
     
     # args for DDP
     args.local_rank = int(os.getenv('LOCAL_RANK', 0))
@@ -31,16 +30,18 @@ def main():
     # Setting random seed for reproducability
     # Seed is 0
     util.setup_seed()
+    
+    #setup(rank)
 
     #Loading config
     with open(args.args_file) as cf_file:
         params = yaml.safe_load( cf_file.read())
     
     # Creating training instances for each GPU
-    if args.world_size > 1:
-        mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
-    else:
-        train(rank=0, args=args, params=params)
+    #if args.world_size > 1:
+    mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
+    #else:
+    #    train(rank=0, args=args, params=params)
 
 # Function for defining machine and port to use for DDP
 # Sets up the process group
@@ -58,7 +59,7 @@ def cleanup():
 
 # Function for training an entire epoch
 # Logs to wandb
-def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch, model_type="yolo", resize=False):
+def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_sampler, criterion, epoch, cluster, resize=False):
     m_loss = util.AverageMeter()
 
     # If in DDP, sampler needs current epoch
@@ -83,10 +84,8 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         samples = samples.float() / 255 # Input images are 8 bit single channel images. Converts to 0-1 floats
 
         outputs = model(samples)  # forward pass
-        if model_type == "yolo":
-            loss = criterion(outputs, targets) # Calculate training loss
-        elif model_type == "deep_ae":
-            loss = criterion(outputs, samples)
+        
+        loss = criterion(outputs, targets) # Calculate training loss
 
         m_loss.update(loss.item(), samples.size(0))
 
@@ -101,14 +100,17 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
             s = batchidx
             step = e + s
             wandb.log({
-                "Training step": step,
-                "Training mloss average": m_loss.avg,
-                "Raw loss": loss
+                f'Training step cluster {cluster}': step,
+                f'Training mloss average cluster {cluster}': m_loss.avg,
+                f'Raw loss cluster {cluster}': loss
             })
 
         del loss # Deletes loss to save memory
         
         optimizer.step() # Steps the optimizer
+        
+        if batchidx > 10:
+            break
 
     scheduler.step() # Step learning rate scheduler
     
@@ -116,8 +118,8 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
 
 # Function that validates the model on a validation set
 # Intended to be used during training and not for testing performance of model
-def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch, model_type="yolo", resize=False):
-    print(f"Beginning epoch validation for epoch {epoch + 1} on GPU {args.local_rank}")     
+def validate_epoch(args, params, model, validation_loader, validation_sampler, criterion, epoch, cluster, resize=False):
+    #print(f"Beginning epoch validation for epoch {epoch + 1} on GPU {args.local_rank}")     
     v_loss = util.AverageMeter()
     
     # If in DDP, sampler needs current epoch
@@ -140,18 +142,18 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
             
             outputs = model(samples) # Forward pass
             
-            if model_type == "yolo":
-                vloss = criterion(outputs, targets) # Calculate loss
-            elif model_type == "deep_ae":
-                vloss = criterion(outputs, samples)
+            vloss = criterion(outputs, targets) # Calculate loss
             
-            torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG) # Syncs loss and takes the average across GPUs
+            #torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG) # Syncs loss and takes the average across GPUs
             v_loss.update(vloss.item(), samples.size(0))
             
             del outputs
             del vloss
             
-    print(f"GPU {args.local_rank} has completed validation")
+            if batchidx > 10:
+                break
+            
+    #print(f"GPU {args.local_rank} has completed validation")
         
     return v_loss
 
@@ -162,26 +164,7 @@ def train(rank, args, params):
     try:
         # Defining world size and creating/connecting to DPP instance
         args.local_rank = rank
-        # setup(rank, args.world_size)
-        
-        # Her bliver cluster skabt. Denne function giver dig et dictionarymed følgende format:
-        states = {
-        'clusters': ['LISTE AF DICTIONARYIES MED MODEL STATES'],
-        'current_cluster': 0 #Int med index for hvilken model, aka model 2 hører til cluster 2
-        }
-        
-        # Model states ser således ud. selfølgelig ikke strings, men de rigtige datatyper
-        cluster = {
-        'model': 'yolo model',
-        'optimizer': 'adam optimizer',
-        'scheduler': 'steplrscheduler',
-        'epoch': 0
-        }
-        
-        states = load_or_create_cluster(args, params)
-        
-        # Vi har også en txt fil til hvert cluster. Det er filerne train_ae_cluster_x.txt, hvor x er cluster index
-
+        setup(rank, args.world_size)
 
         # Init Wandb
         if args.local_rank == 0:
@@ -197,58 +180,67 @@ def train(rank, args, params):
             wandb.log({
                 'Args File': args.args_file
             })
+        
+        # Loading latest checkpoint. Creates template if no checkpoint is found
+        states = load_or_create_clusters(args, params)
 
-        criterion = util.ComputeLoss(model, params)
-
-        starting_epoch = 0
         n_clusters = params['n_clusters']
-        for cluster in n_clusters:
-            model = states.get('clusters')[cluster]
-            optimizer = states.get('optimizer')[cluster]
-            scheduler = states.get('scheduler')[cluster]
-
-            train_txt_file = f"Data/train_ae_cluster_{cluster}.txt"
+        
+        for cluster in range(n_clusters):
+            states['current_cluster'] = cluster
+            model, optimizer, scheduler, starting_epoch = load_current_cluster(states)
+            
+            if starting_epoch + 1 >= params.get('epochs'):
+                print(f"Already trained for {params.get('epochs')} epochs for cluster {cluster}.")
+                continue
+            
+            criterion = util.ComputeLoss(model, params)
+            
+            train_txt_file = f"Data/febtrain_ae_cluster_{cluster}.txt"
+            valid_txt_file = f"Data/febvalid_ae_cluster_{cluster}.txt"
+            train_cache_path = f"Data/images/feb_ae_cluster_{cluster}_train.cache"
+            val_cache_path = f"Data/images/feb_ae_cluster_{cluster}_valid.cache"
 
             train_loader, train_sampler = prepare_loader(args, params,
                             file_txt=train_txt_file,
                             img_folder=params.get('train_imgs'),
                             starting_epoch=starting_epoch,
-                            num_workers=16
-                            )
-                    
+                            num_workers=16,
+                            cache_path_override=train_cache_path
+                            ) 
+
+            validation_loader, validation_sampler = prepare_loader(args, params,
+                        file_txt=valid_txt_file,
+                        img_folder=params.get('val_imgs'),
+                        starting_epoch=starting_epoch,
+                        num_workers=16,
+                        cache_path_override=val_cache_path
+                        )
+
             # Pauses all worker threads to sync up GPUs before training
             torch.distributed.barrier()
             
             # Begin training
             if args.local_rank == 0:
-                print("Beginning training...")
-                for epoch in range(starting_epoch, params.get('epochs')):
-                    if args.local_rank == 0:
-                        print(f"Traning for epoch {epoch + 1}")
-                    m_loss = train_epoch(args, params,
-                                model = model,
-                                optimizer=optimizer,
-                                scheduler=scheduler,
-                                train_loader=train_loader,
-                                train_sampler=train_sampler,
-                                criterion=criterion,
-                                epoch=epoch,
-                                model_type=params.get("model_type")
-                                )
-                    
-
-                valid_txt_file = f"Data/valid_ae_cluster_{cluster}.txt"  
-
-                validation_loader, validation_sampler = prepare_loader(args, params,
-                            file_txt=valid_txt_file,
-                            img_folder=params.get('val_imgs'),
-                            starting_epoch=starting_epoch,
-                            num_workers=16
+                print(f"Beginning training for cluster {cluster}. Utilizing {train_txt_file} for training")
+            
+            for epoch in range(starting_epoch, params.get('epochs')):
+                if args.local_rank == 0:
+                    print(f"Traning cluster {cluster} for epoch {epoch + 1}")
+                
+                m_loss = train_epoch(args, params,
+                            model = model,
+                            optimizer=optimizer,
+                            scheduler=scheduler,
+                            train_loader=train_loader,
+                            train_sampler=train_sampler,
+                            criterion=criterion,
+                            epoch=epoch,
+                            cluster=cluster
                             )
 
-
                 if args.local_rank == 0:
-                    print(f"Validation for epoch {epoch + 1}")
+                    print(f"Validation for cluster {cluster} at epoch {epoch + 1}")
 
                 v_loss = validate_epoch(args, params,
                                     model = model,
@@ -256,27 +248,40 @@ def train(rank, args, params):
                                     validation_sampler=validation_sampler,
                                     criterion=criterion,
                                     epoch=epoch,
-                                    model_type=params.get("model_type")
+                                    cluster=cluster
                                     )    
                 
                 if args.local_rank == 0:
                     print(f"CLUSTER: {cluster} -- Validation for epoch {epoch} complete. Val Loss is at: {v_loss.avg}")
                     wandb.log({
-                        'Epoch': epoch + 1,
-                        'Training Epoch Loss': m_loss.avg,
-                        'Validation Loss': v_loss.avg
+                        f'Epoch Cluster {cluster}': epoch + 1,
+                        f'Training Epoch Loss Cluster {cluster}': m_loss.avg,
+                        f'Validation Loss Cluster {cluster}': v_loss.avg
                     })
                 
                 del m_loss
                 del v_loss
 
-        # Saving checkpoint
-        if args.local_rank == 0:
-            save_checkpoint(model, optimizer, scheduler, epoch + 1, params.get('checkpoint_path'), yolo_size='m')
+                # Saving checkpoint
+                if args.local_rank == 0:
+                    print(f"Saving checkpoint for cluster {cluster} at epoch {epoch + 1}")
+                    save_current_cluster(states=states, 
+                                        path=params.get('checkpoint_path'),
+                                        model=model,
+                                        optimizer=optimizer,
+                                        scheduler=scheduler,
+                                        epoch=epoch + 1)
+            
+            del model
+            del optimizer
+            del scheduler
+            
+            if args.local_rank == 0:
+                print(f"Training Completed succesfully for cluster {cluster}\nTrained for {params.get('epochs')} epochs")
 
         # Training complete
         if args.local_rank == 0:
-                print(f"Training Completed succesfully\nTrained {params.get('epochs')} epochs")
+                print(f"Training Completed succesfully\nTrained {n_clusters} clusters")
         
         torch.distributed.barrier() # Pauses all worker threads to sync up GPUs
         cleanup() # Destroy DDP process group
