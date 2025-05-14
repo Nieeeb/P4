@@ -21,6 +21,8 @@ def main():
 
     args = parser.parse_args()
 
+
+    
     # args for DDP
     args.local_rank = int(os.getenv('LOCAL_RANK', 0))
     print(f"Local rank: {args.local_rank}")
@@ -35,7 +37,10 @@ def main():
         params = yaml.safe_load( cf_file.read())
     
     # Creating training instances for each GPU
-    mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
+    if args.world_size > 1:
+        mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
+    else:
+        train(rank=0, args=args, params=params)
 
 # Function for defining machine and port to use for DDP
 # Sets up the process group
@@ -150,11 +155,14 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
         
     return v_loss
 
+
+
+
 def train(rank, args, params):
     try:
         # Defining world size and creating/connecting to DPP instance
         args.local_rank = rank
-        setup(rank, args.world_size)
+        # setup(rank, args.world_size)
         
         # Her bliver cluster skabt. Denne function giver dig et dictionarymed følgende format:
         states = {
@@ -174,29 +182,7 @@ def train(rank, args, params):
         
         # Vi har også en txt fil til hvert cluster. Det er filerne train_ae_cluster_x.txt, hvor x er cluster index
 
-        if starting_epoch + 1 >= params.get('epochs'):
-            print(f"Already trained for {params.get('epochs')} epochs. Exiting")
-            exit
-        
-        #Dataloading train
-        train_loader, train_sampler = prepare_loader(args, params,
-                                    file_txt=params.get('train_txt'),
-                                    img_folder=params.get('train_imgs'),
-                                    starting_epoch=starting_epoch,
-                                    num_workers=16
-                                    )
 
-        #Dataloading Validation
-        validation_loader, validation_sampler = prepare_loader(args, params,
-                                    file_txt=params.get('val_txt'),
-                                    img_folder=params.get('val_imgs'),
-                                    starting_epoch=starting_epoch,
-                                    num_workers=16
-                                    )
-        
-        # Defining loss function for training
-        criterion = util.ComputeLoss(model, params)
-        
         # Init Wandb
         if args.local_rank == 0:
             wandb.init(
@@ -206,68 +192,102 @@ def train(rank, args, params):
                 group=params.get('run_name'),
                 id=params.get('run_name')
             )
-        
+
         if args.local_rank == 0:
             wandb.log({
                 'Args File': args.args_file
             })
-        
-        # Pauses all worker threads to sync up GPUs before training
-        torch.distributed.barrier()
-        
-        # Begin training
-        if args.local_rank == 0:
-            print("Beginning training...")
-        for epoch in range(starting_epoch, params.get('epochs')):
+
+        criterion = util.ComputeLoss(model, params)
+
+        starting_epoch = 0
+        n_clusters = params['n_clusters']
+        for cluster in n_clusters:
+            model = states.get('clusters')[cluster]
+            optimizer = states.get('optimizer')[cluster]
+            scheduler = states.get('scheduler')[cluster]
+
+            train_txt_file = f"Data/train_ae_cluster_{cluster}.txt"
+
+            train_loader, train_sampler = prepare_loader(args, params,
+                            file_txt=train_txt_file,
+                            img_folder=params.get('train_imgs'),
+                            starting_epoch=starting_epoch,
+                            num_workers=16
+                            )
+                    
+            # Pauses all worker threads to sync up GPUs before training
+            torch.distributed.barrier()
+            
+            # Begin training
             if args.local_rank == 0:
-                print(f"Traning for epoch {epoch + 1}")
-            m_loss = train_epoch(args, params,
-                        model = model,
-                        optimizer=optimizer,
-                        scheduler=scheduler,
-                        train_loader=train_loader,
-                        train_sampler=train_sampler,
-                        criterion=criterion,
-                        epoch=epoch,
-                        model_type=params.get("model_type")
-                        )
-            if args.local_rank == 0:
-                print(f"Validation for epoch {epoch + 1}")
-            v_loss = validate_epoch(args, params,
+                print("Beginning training...")
+                for epoch in range(starting_epoch, params.get('epochs')):
+                    if args.local_rank == 0:
+                        print(f"Traning for epoch {epoch + 1}")
+                    m_loss = train_epoch(args, params,
                                 model = model,
-                                validation_loader=validation_loader,
-                                validation_sampler=validation_sampler,
+                                optimizer=optimizer,
+                                scheduler=scheduler,
+                                train_loader=train_loader,
+                                train_sampler=train_sampler,
                                 criterion=criterion,
                                 epoch=epoch,
                                 model_type=params.get("model_type")
-                                )    
-        
-            if args.local_rank == 0:
-                print(f"Validation for epoch {epoch} complete. Val Loss is at: {v_loss.avg}")
-                wandb.log({
-                    'Epoch': epoch + 1,
-                    'Training Epoch Loss': m_loss.avg,
-                    'Validation Loss': v_loss.avg
-                })
+                                )
+                    
+
+                valid_txt_file = f"Data/valid_ae_cluster_{cluster}.txt"  
+
+                validation_loader, validation_sampler = prepare_loader(args, params,
+                            file_txt=valid_txt_file,
+                            img_folder=params.get('val_imgs'),
+                            starting_epoch=starting_epoch,
+                            num_workers=16
+                            )
+
+
+                if args.local_rank == 0:
+                    print(f"Validation for epoch {epoch + 1}")
+
+                v_loss = validate_epoch(args, params,
+                                    model = model,
+                                    validation_loader=validation_loader,
+                                    validation_sampler=validation_sampler,
+                                    criterion=criterion,
+                                    epoch=epoch,
+                                    model_type=params.get("model_type")
+                                    )    
+                
+                if args.local_rank == 0:
+                    print(f"CLUSTER: {cluster} -- Validation for epoch {epoch} complete. Val Loss is at: {v_loss.avg}")
+                    wandb.log({
+                        'Epoch': epoch + 1,
+                        'Training Epoch Loss': m_loss.avg,
+                        'Validation Loss': v_loss.avg
+                    })
                 
                 del m_loss
                 del v_loss
-            
-            # Saving checkpoint
-            if args.local_rank == 0:
-                save_checkpoint(model, optimizer, scheduler, epoch + 1, params.get('checkpoint_path'), yolo_size='m')
-        
+
+        # Saving checkpoint
+        if args.local_rank == 0:
+            save_checkpoint(model, optimizer, scheduler, epoch + 1, params.get('checkpoint_path'), yolo_size='m')
+
         # Training complete
         if args.local_rank == 0:
                 print(f"Training Completed succesfully\nTrained {params.get('epochs')} epochs")
         
         torch.distributed.barrier() # Pauses all worker threads to sync up GPUs
         cleanup() # Destroy DDP process group
-        
+
+
+
     except Exception as e:
         cleanup()
         print(e)
         exit
+
 
 if __name__ == "__main__":
     main()
