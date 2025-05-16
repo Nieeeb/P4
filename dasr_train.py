@@ -108,7 +108,7 @@ def train(rank, params, args):
     try:
         # Defining world size and creating/connecting to DPP instance
         args['local_rank'] = rank
-        setup(rank, args['world_size'])
+        #setup(rank, args['world_size'])
         
         # Loading model
         # Loads if a valid checkpoint is found, otherwise creates a new model
