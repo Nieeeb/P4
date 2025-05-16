@@ -217,12 +217,12 @@ def load_latest_dasr(path: str, args): #-> Tuple[torch.nn.Module | torch.nn.para
             m=args['momentum'],
             T=args['temperature']
             ).cuda()
-    model = torch.nn.parallel.DistributedDataParallel(model)
+    #model = torch.nn.parallel.DistributedDataParallel(model)
     model.load_state_dict(state_dict=state_dict['model'])
     model.to(args['local_rank'])
         
     optimizer = torch.optim.Adam(
-                            model.module.encoder_q.parameters(),
+                            model.encoder_q.parameters(),
                             lr=args['lr'], weight_decay=args['weight_decay']
                             )
     optimizer.load_state_dict(state_dict['optimizer'])
@@ -254,11 +254,11 @@ def load_or_create_dasr(args):
                         m=args['momentum'],
                         T=args['temperature']
                         ).cuda()
-            model = torch.nn.parallel.DistributedDataParallel(model)
+            #model = torch.nn.parallel.DistributedDataParallel(model)
             model = model.to(args['local_rank'])
 
             optimizer = torch.optim.Adam(
-                            model.module.encoder_q.parameters(),
+                            model.encoder_q.parameters(),
                             lr=args['lr'], weight_decay=args['weight_decay']
                             )
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args['step_size'], last_epoch=-1)

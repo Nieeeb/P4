@@ -40,7 +40,8 @@ def main():
     print(f"World size: {params['world_size']}")
     
     # Creating training instances for each GPU
-    mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
+    #mp.spawn(train, args=(args, params), nprocs=args.world_size, join=True)
+    train(args.local_rank, args, params)
 
 # Function for defining machine and port to use for DDP
 # Sets up the process group
@@ -63,8 +64,8 @@ def train_epoch(args, moco_model, optimizer, scheduler, train_loader, train_samp
 
     # If in DDP, sampler needs current epoch
     # Used to determine which data shuffle to use if GPUs get desynced
-    if args['world_size'] > 1:
-        train_sampler.set_epoch(epoch)
+    #if args['world_size'] > 1:
+    #    train_sampler.set_epoch(epoch)
         
     # Model set to train
     moco_model.train()
@@ -121,10 +122,11 @@ def train(rank, params, args):
         dataset = GrayscalePatchDataset(patch_size=args['patch_size'],
                                         files_txt=args['train_txt'],
                                         img_folder=args['train_imgs'])
-        train_sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=True)
-        train_sampler.set_epoch(starting_epoch)
-        train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=True, pin_memory=True, num_workers=args['num_workers'])
-
+        #train_sampler = DistributedSampler(dataset=dataset, shuffle=True, drop_last=True)
+        #train_sampler.set_epoch(starting_epoch)
+        #train_loader = DataLoader(dataset, batch_size=args['batch_size'], sampler=train_sampler, drop_last=True, pin_memory=True, num_workers=args['num_workers'])
+        train_loader = DataLoader(dataset, batch_size=args['batch_size'], drop_last=True, pin_memory=True, num_workers=args['num_workers'])
+        
         loss_fn = torch.nn.CrossEntropyLoss().to(args['local_rank'])
         
         # Init Wandb
@@ -144,7 +146,7 @@ def train(rank, params, args):
         
         # Pauses all worker threads to sync up GPUs before training
         print(f"GPU {args['local_rank']} is ready")
-        torch.distributed.barrier()
+        #torch.distributed.barrier()
         
         # Begin training
         if args['local_rank'] == 0:
@@ -159,7 +161,7 @@ def train(rank, params, args):
                         optimizer=optimizer,
                         scheduler=scheduler,
                         train_loader=train_loader,
-                        train_sampler=train_sampler,
+                        train_sampler=None,
                         loss_fn=loss_fn,
                         epoch=epoch
                         )  
@@ -181,11 +183,11 @@ def train(rank, params, args):
         if args['local_rank'] == 0:
                 print(f"Training Completed succesfully\nTrained {args['epochs']} epochs")
         
-        torch.distributed.barrier() # Pauses all worker threads to sync up GPUs
-        cleanup() # Destroy DDP process group
+        #torch.distributed.barrier() # Pauses all worker threads to sync up GPUs
+        #cleanup() # Destroy DDP process group
             
     except Exception as e:
-        cleanup()
+        #cleanup()
         print(e)
         exit
 

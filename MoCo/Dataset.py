@@ -62,8 +62,7 @@ class GrayscalePatchDataset(Dataset):
                 
         self.patch_size = patch_size
         self.transform = transforms.Compose([transforms.ToTensor(),
-                                            transforms.RandomVerticalFlip(),
-                                            transforms.RandomHorizontalFlip()
+                                            transforms.RandomRotation(45)
                                             ]) #gør billeder til tensor
 
     def __len__(self): return len(self.paths)
