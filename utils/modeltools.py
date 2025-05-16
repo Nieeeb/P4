@@ -185,7 +185,7 @@ def load_or_create_clusters(args, params):
 
 # Method for saving trainign state to a given path
 # Path should be a folder
-def save_checkpoint_dasr(model: MoCo, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.LRScheduler, epoch: int, path: str):
+def save_checkpoint_dasr(model: torch.nn.Module, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.LRScheduler, epoch: int, path: str):
     state_dict ={
         'model': model.state_dict(),
         'optimizer': optimizer.state_dict(),

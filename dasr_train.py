@@ -153,6 +153,7 @@ def train(rank, params, args):
         for epoch in range(starting_epoch, args['epochs']):
             if args['local_rank'] == 0:
                 print(f"Traning for epoch {epoch + 1}")
+                
             m_loss = train_epoch(args,
                         moco_model = moco_model,
                         optimizer=optimizer,
