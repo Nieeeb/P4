@@ -7,8 +7,9 @@ from torch import nn
 import torch.nn.functional as F
 
 from torchvision.models import resnet50
-from kornia import augmentation as augs
-from kornia import filters
+#from kornia import augmentation as augs
+#from kornia import filters
+from torchvision import transforms
 
 # helper functions
 
@@ -139,9 +140,9 @@ class ContrastiveLearner(nn.Module):
         self.net = OutputHiddenLayer(net, layer=hidden_layer)
 
         DEFAULT_AUG = nn.Sequential(
-            augs.RandomHorizontalFlip(),
-            RandomApply(filters.GaussianBlur2d((3, 3), (1.5, 1.5)), p=0.1),
-            augs.RandomResizedCrop((image_size, image_size))
+            transforms.RandomHorizontalFlip(),
+            RandomApply(transforms.GaussianBlur((3, 3), (1.5, 1.5)), p=0.1),
+            transforms.RandomResizedCrop((image_size, image_size))
         )
 
         self.augment = default(augment_fn, DEFAULT_AUG)
