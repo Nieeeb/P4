@@ -130,7 +130,7 @@ def load_latest_contrastive(path: str): #-> Tuple[torch.nn.Module | torch.nn.par
                                 hidden_layer=-1,
                                 augment_both=True,
                                 use_nt_xent_loss=True,
-                                project_dim=128
+                                project_dim=256
                                 ).cuda()
     learner.load_state_dict(state_dict=state_dict['learner'])
         
@@ -162,7 +162,7 @@ def load_or_create_contrastive(args):
                                         hidden_layer=-1,
                                         augment_both=True,
                                         use_nt_xent_loss=True,
-                                        project_dim=128
+                                        project_dim=256
                                         ).cuda()
 
             optimizer = torch.optim.Adam(learner.parameters())
