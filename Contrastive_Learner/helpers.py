@@ -64,8 +64,8 @@ class ContrastiveDataset(Dataset):
                 self.paths.append(img_folder + filename) 
                 
         self.transform = transforms.Compose([transforms.ToTensor(),
-                                            transforms.Resize((128,128)
-                                                            )]) #gør billeder til tensor
+                                            transforms.Resize((144,192))
+                                            ]) #gør billeder til tensor
 
     def __len__(self): return len(self.paths)
 
