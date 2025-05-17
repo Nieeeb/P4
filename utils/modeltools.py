@@ -9,7 +9,7 @@ import cv2
 from MoCo.Moco import MoCo
 from MoCo.Dataset import Encoder
 import copy
-from contrastive_learner.contrastive_learner import ContrastiveLearner
+from Contrastive_Learner.contrastivelearner import ContrastiveLearner
 #from contrastive_learner.contrastive_helpers.py import load
 
 # Method for saving trainign state to a given path

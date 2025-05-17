@@ -168,7 +168,7 @@ class ContrastiveLearner(nn.Module):
         self.keys = None
 
         # send a mock image tensor to instantiate parameters
-        self.forward(torch.randn(1, 1, image_size, image_size).cuda())
+        self.forward(torch.randn(2, 1, image_size, image_size).cuda())
 
     @singleton('key_encoder')
     def _get_key_encoder(self):
