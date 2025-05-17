@@ -9,6 +9,8 @@ import cv2
 from MoCo.Moco import MoCo
 from MoCo.Dataset import Encoder
 import copy
+from contrastive_learner.contrastive_learner import ContrastiveLearner
+#from contrastive_learner.contrastive_helpers.py import load
 
 # Method for saving trainign state to a given path
 # Path should be a folder
@@ -92,6 +94,85 @@ def load_or_create_state(args, params):
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
             
         return model, optimizer, scheduler, starting_epoch
+
+# Method for saving trainign state to a given path
+# Path should be a folder
+def save_contrastive(learner: torch.nn.Module, optimizer: torch.optim.Optimizer, scheduler: torch.optim.lr_scheduler.LRScheduler, epoch: int, path: str):
+    state_dict ={
+        'learner': learner.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'scheduler': scheduler.state_dict(),
+        'epoch': epoch
+    }
+    if not Path(path).exists():
+        parent = os.path.dirname(path)
+        if not Path(parent).exists():
+            os.mkdir(parent)
+        os.mkdir(path)
+    
+    # Save a state with current epoch number
+    torch.save(state_dict, os.path.join(path, f"{epoch}"))
+    
+    # Save a copy as "latest" for easy reloading
+    torch.save(state_dict, os.path.join(path, "latest"))
+
+# Method for loading the latest checkpoint from a folder
+# Path should be a folder containing state dicts
+def load_latest_contrastive(path: str): #-> Tuple[torch.nn.Module | torch.nn.parallel.DistributedDataParallel, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler, int]:
+    assert Path(path).exists()
+    state_path = os.path.join(path, 'latest')
+    state_dict = torch.load(state_path, weights_only=False)
+
+    conv = ConvAutoencoder().cuda()
+    backbone = conv.encoder
+    learner = ContrastiveLearner(net = backbone,
+                                image_size= 128,
+                                hidden_layer=-1,
+                                augment_both=True,
+                                use_nt_xent_loss=True,
+                                project_dim=128
+                                ).cuda()
+    learner.load_state_dict(state_dict=state_dict['learner'])
+        
+    optimizer = torch.optim.Adam(learner.parameters())
+    optimizer.load_state_dict(state_dict['optimizer'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10)
+    scheduler.load_state_dict(state_dict['scheduler'])
+    epoch = state_dict['epoch']
+    
+    return learner, optimizer, scheduler, epoch
+
+# Given a path, first checks if a checkpoint is already saved
+# If no checkpoint is found, a new model, optimizer, and scheduler are created
+def load_or_create_contrastive(args):
+        checkpoint_path = args['checkpoint_path']
+        starting_epoch = 0
+        if check_checkpoint(checkpoint_path):
+            learner, optimizer, scheduler, starting_epoch = load_latest_contrastive(checkpoint_path)
+            learner.to(args['local_rank'])
+            print(f"Checkpoint found, starting from epoch {starting_epoch + 1}")
+        else:
+            print("No checkpoint found, starting new training")
+            starting_epoch = 0
+            
+            conv = ConvAutoencoder().cuda()
+            backbone = conv.encoder
+            learner = ContrastiveLearner(net = backbone,
+                                        image_size= 128,
+                                        hidden_layer=-1,
+                                        augment_both=True,
+                                        use_nt_xent_loss=True,
+                                        project_dim=128
+                                        ).cuda()
+
+            optimizer = torch.optim.Adam(learner.parameters())
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10)
+            
+            learner = learner.to(args['local_rank'])
+            
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, last_epoch=-1)
+            
+        return learner, optimizer, scheduler, starting_epoch
 
 def load_latest_clusters(path: str):
     assert Path(path).exists()
