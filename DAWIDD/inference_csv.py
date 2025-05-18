@@ -20,7 +20,7 @@ import torchvision
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--args_file', type=str, default='utils/args.yaml',
+    parser.add_argument('--args_file', type=str, default='utils/contrastive_args.yaml',
                         help="YAML file with data paths & loader params")
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--stride', type=int, default=3,
