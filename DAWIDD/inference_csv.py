@@ -18,6 +18,7 @@ from sklearn.cluster import DBSCAN, KMeans
 import copy
 import torchvision
 from utils.modeltools import load_latest_contrastive
+from torch import nn
 
 def main():
     parser = argparse.ArgumentParser()
@@ -54,8 +55,8 @@ def main():
     #print(f"Average distance between months: {avg}")
     
     flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten_contrastive_trained_on_feb.csv')
-    flat = pd.read_csv('DAWIDD/flatten_contrastive_trained_on_feb.csv', index_col=0, header='infer')
+    flat.to_csv('DAWIDD/flatten_contrastive_trained_on_full.csv')
+    flat = pd.read_csv('DAWIDD/flatten_contrastive_trained_on_full.csv', index_col=0, header='infer')
     print(flat.head())
     
 def add_dates(args, params):
@@ -63,7 +64,7 @@ def add_dates(args, params):
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_contrastive_trained_on_feb.pickle')
+    df = torch.load('DAWIDD/encodings_contrastive_trained_on_full.pickle')
     
     filenames = pd.Series(get_txt(file_txt=params['train_txt'],
                         img_folder=params['train_imgs']))
@@ -161,7 +162,7 @@ def write_inference(args, params):
 
     # checkpoint path
     #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/latest'
-    ckpt = 'runs/contrastive_feb_2/'
+    ckpt = 'runs/contrastive_full_1/'
     #ckpt = 'DAWIDD/latest'
     
     model, _, _, _ = load_latest_contrastive(ckpt)
@@ -176,6 +177,12 @@ def write_inference(args, params):
     #model.load_state_dict(stripped)
     model.eval()
     
+    mlp = nn.Sequential(
+            nn.Linear(128, 128, bias = False),
+            nn.LeakyReLU(inplace=True),
+            nn.Linear(128, 256, bias = False)
+        ).cuda()
+    
     encodings = []
     with torch.no_grad():
         for images, *_ in tqdm(loader, total=len(loader), desc="Encoding Batches"):
@@ -187,7 +194,7 @@ def write_inference(args, params):
             #outputs = model.encode(images)
             outputs = model.net(images)
             #project_fn = model._get_projection_fn(outputs)
-            #outputs = project_fn(outputs)
+            #outputs = map(project_fn, (outputs))
             #print(outputs.shape)
             #print(outputs.shape)
             
@@ -201,7 +208,7 @@ def write_inference(args, params):
     
     df = pd.DataFrame(encodings)
     #df.to_csv('DAWIDD/encodings_train.csv')
-    torch.save(df, 'DAWIDD/encodings_contrastive_trained_on_feb.pickle')
+    torch.save(df, 'DAWIDD/encodings_contrastive_trained_on_full.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):
