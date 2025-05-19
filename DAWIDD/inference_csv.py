@@ -17,6 +17,7 @@ from nets.autoencoder import ConvAutoencoder
 from sklearn.cluster import DBSCAN, KMeans
 import copy
 import torchvision
+from utils.modeltools import load_latest_contrastive
 
 def main():
     parser = argparse.ArgumentParser()
@@ -146,23 +147,26 @@ def write_inference(args, params):
     # data loader
     loader, _ = prepare_loader(
         args, params,
-        file_txt=params['val_txt'],
-        img_folder=params['val_imgs'],
+        file_txt=params['train_txt'],
+        img_folder=params['train_imgs'],
         starting_epoch=-1,
         num_workers=16,
         shuffle = False
     )
 
     # checkpoint path
-    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/latest'
+    #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/latest'
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/'
     #ckpt = 'DAWIDD/latest'
     
-    device = torch.device(args.local_rank)
-    model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
-    ckpt = torch.load(ckpt, map_location=device)
-    raw = ckpt.get('model', ckpt)
-    stripped = {k.replace('module.', ''): v for k, v in raw.items()}
-    model.load_state_dict(stripped)
+    model, _, _, _ = load_latest_contrastive(ckpt)
+    
+    #device = torch.device(args.local_rank)
+    #model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
+    #ckpt = torch.load(ckpt, map_location=device)
+    #raw = ckpt.get('model', ckpt)
+    #stripped = {k.replace('module.', ''): v for k, v in raw.items()}
+    #model.load_state_dict(stripped)
     model.eval()
     
     encodings = []
