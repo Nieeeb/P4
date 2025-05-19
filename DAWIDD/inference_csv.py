@@ -54,8 +54,8 @@ def main():
     #print(f"Average distance between months: {avg}")
     
     flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten_contrastive_latest.csv')
-    flat = pd.read_csv('DAWIDD/flatten_contrastive_latest.csv', index_col=0, header='infer')
+    flat.to_csv('DAWIDD/flatten_contrastive_trained_on_feb.csv')
+    flat = pd.read_csv('DAWIDD/flatten_contrastive_trained_on_feb.csv', index_col=0, header='infer')
     print(flat.head())
     
 def add_dates(args, params):
@@ -63,10 +63,10 @@ def add_dates(args, params):
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_contrastive_latest.pickle')
+    df = torch.load('DAWIDD/encodings_contrastive_trained_on_feb.pickle')
     
-    filenames = pd.Series(get_txt(file_txt=params['val_txt'],
-                        img_folder=params['val_imgs']))
+    filenames = pd.Series(get_txt(file_txt=params['train_txt'],
+                        img_folder=params['train_imgs']))
     
     datetimes = pd.Series(extract_datetimes(filenames))
     
@@ -145,21 +145,28 @@ def calculate_distances(monthly_data):
 
 def write_inference(args, params):
     # data loader
+    
+    cache_override = "Data/images/fultrain_sorted.cache"
+    #cache_override = "Data/images/contest.cache"
+    
     loader, _ = prepare_loader(
         args, params,
         file_txt=params['train_txt'],
         img_folder=params['train_imgs'],
         starting_epoch=-1,
         num_workers=16,
-        shuffle = False
+        shuffle = False,
+        cache_path_override=cache_override
     )
 
     # checkpoint path
     #ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/latest'
-    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/'
+    ckpt = 'runs/contrastive_feb_2/'
     #ckpt = 'DAWIDD/latest'
     
     model, _, _, _ = load_latest_contrastive(ckpt)
+    
+    
     
     #device = torch.device(args.local_rank)
     #model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
@@ -177,7 +184,12 @@ def write_inference(args, params):
             resize = torchvision.transforms.Resize((128,128))
             images = resize(images)
             
-            outputs = model.encode(images)
+            #outputs = model.encode(images)
+            outputs = model.net(images)
+            #project_fn = model._get_projection_fn(outputs)
+            #outputs = project_fn(outputs)
+            #print(outputs.shape)
+            #print(outputs.shape)
             
             #print(outputs.shape)
             
@@ -189,7 +201,7 @@ def write_inference(args, params):
     
     df = pd.DataFrame(encodings)
     #df.to_csv('DAWIDD/encodings_train.csv')
-    torch.save(df, 'DAWIDD/encodings_contrastive_latest.pickle')
+    torch.save(df, 'DAWIDD/encodings_contrastive_trained_on_feb.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):
