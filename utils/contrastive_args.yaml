@@ -1,7 +1,7 @@
 checkpoint_path: "runs/contrastive_feb_1"  # Path to save model checkpoints
 
 train_imgs: "Data/images/train/"
-train_txt: "Data/FEBtrain.txt"
+train_txt: "Data/train.txt"
 
 epochs: 100                 # Number of epochs to train
 run_name: "contrastive_feb_1"        # Name of the run for wandb loggin

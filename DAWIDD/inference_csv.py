@@ -20,7 +20,7 @@ import torchvision
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--args_file', type=str, default='utils/args.yaml',
+    parser.add_argument('--args_file', type=str, default='utils/contrastive_args.yaml',
                         help="YAML file with data paths & loader params")
     parser.add_argument('--world_size', type=int, default=1)
     parser.add_argument('--stride', type=int, default=3,
@@ -53,8 +53,8 @@ def main():
     #print(f"Average distance between months: {avg}")
     
     flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten_ae_febvalid.csv')
-    flat = pd.read_csv('DAWIDD/flatten_ae_febvalid.csv', index_col=0, header='infer')
+    flat.to_csv('DAWIDD/flatten_contrastive_latest.csv')
+    flat = pd.read_csv('DAWIDD/flatten_contrastive_latest.csv', index_col=0, header='infer')
     print(flat.head())
     
 def add_dates(args, params):
@@ -62,7 +62,7 @@ def add_dates(args, params):
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_ae_febvalid.pickle')
+    df = torch.load('DAWIDD/encodings_contrastive_latest.pickle')
     
     filenames = pd.Series(get_txt(file_txt=params['val_txt'],
                         img_folder=params['val_imgs']))
@@ -154,8 +154,8 @@ def write_inference(args, params):
     )
 
     # checkpoint path
-    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-    ckpt = 'runs/feb_ae_local_2/100'
+    ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/contrastive_full_1/latest'
+    #ckpt = 'DAWIDD/latest'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
@@ -185,7 +185,7 @@ def write_inference(args, params):
     
     df = pd.DataFrame(encodings)
     #df.to_csv('DAWIDD/encodings_train.csv')
-    torch.save(df, 'DAWIDD/encodings_ae_febvalid.pickle')
+    torch.save(df, 'DAWIDD/encodings_contrastive_latest.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):
