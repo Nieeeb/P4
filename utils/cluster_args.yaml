@@ -20,21 +20,17 @@ dfl: 1.5                      # cls loss gain
 #mosaic: 1.00000               # image mosaic (probability)
 #mix_up: 0.00000               # image mix-up (probability)
 online: False                # If Data should be pulled from online datastore or is stored locally
-checkpoint_path: "runs/yolo_m_testing"  # Path to save model checkpoints
+checkpoint_path: "runs/yolo_m_cluster_testing"  # Path to save model checkpoints
 train_imgs: "Data/images/train/"
-train_txt: "Data/train.txt"
 val_imgs: "Data/images/valid/"
-val_txt: "Data/valid.txt"
 epochs: 100                 # Number of epochs to train
-batch_size: 10              # Batch size for data loading
+batch_size: 40              # Batch size for data loading
 input_size: 384 #384             # Input size of images
-run_name: "yolo_m_testing"        # Name of the run for wandb loggin
-augment: False               # Augment or not
-model_type:  yolo           # What model to use. Usually deep_ae or yolo
+run_name: "yolo_m_cluster_testing"        # Name of the run for wandb loggin
 
-n_clusters: 11
+path_prefix: feb_ae
 
-best_model_epoch: "9"
+n_clusters: 7
 # classes
 names:
   0: person

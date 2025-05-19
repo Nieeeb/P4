@@ -21,7 +21,6 @@ def main():
 
     args = parser.parse_args()
 
-    
     # args for DDP
     args.local_rank = int(os.getenv('LOCAL_RANK', 0))
     print(f"Local rank: {args.local_rank}")
@@ -108,9 +107,6 @@ def train_epoch(args, params, model, optimizer, scheduler, train_loader, train_s
         del loss # Deletes loss to save memory
         
         optimizer.step() # Steps the optimizer
-        
-        if batchidx > 10:
-            break
 
     scheduler.step() # Step learning rate scheduler
     
@@ -150,9 +146,6 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
             del outputs
             del vloss
             
-            if batchidx > 10:
-                break
-            
     #print(f"GPU {args.local_rank} has completed validation")
         
     return v_loss
@@ -190,16 +183,18 @@ def train(rank, args, params):
             states['current_cluster'] = cluster
             model, optimizer, scheduler, starting_epoch = load_current_cluster(states)
             
-            if starting_epoch + 1 >= params.get('epochs'):
-                print(f"Already trained for {params.get('epochs')} epochs for cluster {cluster}.")
+            if starting_epoch >= params.get('epochs'):
+                print(f"CLUSTER: {cluster} -- Already trained for {starting_epoch} epochs.")
                 continue
             
             criterion = util.ComputeLoss(model, params)
             
-            train_txt_file = f"Data/febtrain_ae_cluster_{cluster}.txt"
-            valid_txt_file = f"Data/febvalid_ae_cluster_{cluster}.txt"
-            train_cache_path = f"Data/images/feb_ae_cluster_{cluster}_train.cache"
-            val_cache_path = f"Data/images/feb_ae_cluster_{cluster}_valid.cache"
+            path_prefix = params['path_prefix']
+            
+            train_txt_file = f"Data/{path_prefix}_cluster_{cluster}_train.txt"
+            valid_txt_file = f"Data/{path_prefix}_cluster_{cluster}_valid.txt"
+            train_cache_path = f"Data/images/{path_prefix}_cluster_{cluster}_train.cache"
+            val_cache_path = f"Data/images/{path_prefix}_cluster_{cluster}_valid.cache"
 
             train_loader, train_sampler = prepare_loader(args, params,
                             file_txt=train_txt_file,
@@ -222,11 +217,11 @@ def train(rank, args, params):
             
             # Begin training
             if args.local_rank == 0:
-                print(f"Beginning training for cluster {cluster}. Utilizing {train_txt_file} for training")
+                print(f"CLUSTER: {cluster} -- Beginning training for cluster. Utilizing {train_txt_file} for training")
             
             for epoch in range(starting_epoch, params.get('epochs')):
                 if args.local_rank == 0:
-                    print(f"Traning cluster {cluster} for epoch {epoch + 1}")
+                    print(f"CLUSTER: {cluster} -- Traning cluster for epoch {epoch + 1}")
                 
                 m_loss = train_epoch(args, params,
                             model = model,
@@ -240,7 +235,7 @@ def train(rank, args, params):
                             )
 
                 if args.local_rank == 0:
-                    print(f"Validation for cluster {cluster} at epoch {epoch + 1}")
+                    print(f"CLUSTER: {cluster} -- Validation for cluster at epoch {epoch + 1}")
 
                 v_loss = validate_epoch(args, params,
                                     model = model,
@@ -264,7 +259,7 @@ def train(rank, args, params):
 
                 # Saving checkpoint
                 if args.local_rank == 0:
-                    print(f"Saving checkpoint for cluster {cluster} at epoch {epoch + 1}")
+                    print(f"CLUSTER: {cluster} -- Saving checkpoint for cluster at epoch {epoch + 1}")
                     save_current_cluster(states=states, 
                                         path=params.get('checkpoint_path'),
                                         model=model,
