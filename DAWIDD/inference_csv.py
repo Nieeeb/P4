@@ -53,8 +53,8 @@ def main():
     #print(f"Average distance between months: {avg}")
     
     flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten_ae_febtrain.csv')
-    flat = pd.read_csv('DAWIDD/flatten_ae_febtrain.csv', index_col=0, header='infer')
+    flat.to_csv('DAWIDD/flatten_ae_febvalid.csv')
+    flat = pd.read_csv('DAWIDD/flatten_ae_febvalid.csv', index_col=0, header='infer')
     print(flat.head())
     
 def add_dates(args, params):
@@ -62,10 +62,10 @@ def add_dates(args, params):
     #df['output'] = df['output'].apply(ast.literal_eval).apply(np.array)
     
     #df = torch.load('DAWIDD/encodings_valid_local.pickle')
-    df = torch.load('DAWIDD/encodings_ae_febtrain.pickle')
+    df = torch.load('DAWIDD/encodings_ae_febvalid.pickle')
     
-    filenames = pd.Series(get_txt(file_txt=params['train_txt'],
-                        img_folder=params['train_imgs']))
+    filenames = pd.Series(get_txt(file_txt=params['val_txt'],
+                        img_folder=params['val_imgs']))
     
     datetimes = pd.Series(extract_datetimes(filenames))
     
@@ -146,8 +146,8 @@ def write_inference(args, params):
     # data loader
     loader, _ = prepare_loader(
         args, params,
-        file_txt=params['train_txt'],
-        img_folder=params['train_imgs'],
+        file_txt=params['val_txt'],
+        img_folder=params['val_imgs'],
         starting_epoch=-1,
         num_workers=16,
         shuffle = False
@@ -155,7 +155,7 @@ def write_inference(args, params):
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
-    ckpt = 'Data/temp/50'
+    ckpt = 'runs/feb_ae_local_2/100'
     
     device = torch.device(args.local_rank)
     model = ConvAutoencoder(nc=1, nfe=64, nfd=64, nz=256).to(device)
@@ -185,7 +185,7 @@ def write_inference(args, params):
     
     df = pd.DataFrame(encodings)
     #df.to_csv('DAWIDD/encodings_train.csv')
-    torch.save(df, 'DAWIDD/encodings_ae_febtrain.pickle')
+    torch.save(df, 'DAWIDD/encodings_ae_febvalid.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):
