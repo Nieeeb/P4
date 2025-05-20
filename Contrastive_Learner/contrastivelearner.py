@@ -166,13 +166,9 @@ class ContrastiveLearner(nn.Module):
         # for accumulating queries and keys across calls
         self.queries = None
         self.keys = None
-        
-        test_sample = torch.randn(2, 1, image_size, image_size).cuda()
-        
-        self.project_fn = None
-        
+
         # send a mock image tensor to instantiate parameters
-        self.forward(test_sample)
+        self.forward(torch.randn(2, 1, image_size, image_size).cuda())
 
     @singleton('key_encoder')
     def _get_key_encoder(self):
@@ -230,11 +226,8 @@ class ContrastiveLearner(nn.Module):
             W = self._get_bilinear(keys)
             keys = (W @ keys.t()).t()
 
-        if self.project_fn is None:
-            self.project_fn = self._get_projection_fn(queries) if self.project_hidden else identity
-        #queries, keys = map(project_fn, (queries, keys))
-        
-        queries, keys = map(self.project_fn, (queries, keys))
+        project_fn = self._get_projection_fn(queries) if self.project_hidden else identity
+        queries, keys = map(project_fn, (queries, keys))
 
         self.queries = safe_concat(self.queries, queries)
         self.keys = safe_concat(self.keys, keys)
