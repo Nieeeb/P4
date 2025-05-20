@@ -55,8 +55,8 @@ def main():
     #print(f"Average distance between months: {avg}")
     
     flat = flatten_output(data)
-    flat.to_csv('DAWIDD/flatten_contrastive_trained_on_full.csv')
-    flat = pd.read_csv('DAWIDD/flatten_contrastive_trained_on_full.csv', index_col=0, header='infer')
+    flat.to_csv('DAWIDD/flatten_contrastive_trained_on_full_mlp.csv')
+    flat = pd.read_csv('DAWIDD/flatten_contrastive_trained_on_full_mlp.csv', index_col=0, header='infer')
     print(flat.head())
     
 def add_dates(args, params):
@@ -144,6 +144,9 @@ def calculate_distances(monthly_data):
         print(f"Distance from month {key[0]} to month {key[1]}: {dist:.4f}")
     return distances
 
+def flatten(t):
+    return t.reshape(t.shape[0], -1)
+
 def write_inference(args, params):
     # data loader
     
@@ -166,6 +169,7 @@ def write_inference(args, params):
     #ckpt = 'DAWIDD/latest'
     
     model, _, _, _ = load_latest_contrastive(ckpt)
+    #print(model)
     
     
     
@@ -193,6 +197,8 @@ def write_inference(args, params):
             
             #outputs = model.encode(images)
             outputs = model.net(images)
+            outputs = flatten(outputs)
+            outputs = model.projection(outputs)
             #project_fn = model._get_projection_fn(outputs)
             #outputs = map(project_fn, (outputs))
             #print(outputs.shape)
@@ -208,7 +214,7 @@ def write_inference(args, params):
     
     df = pd.DataFrame(encodings)
     #df.to_csv('DAWIDD/encodings_train.csv')
-    torch.save(df, 'DAWIDD/encodings_contrastive_trained_on_full.pickle')
+    torch.save(df, 'DAWIDD/encodings_contrastive_trained_on_full_mlp.pickle')
     print("--------- Write Complete ----------")
     
 def get_txt(file_txt, img_folder):
