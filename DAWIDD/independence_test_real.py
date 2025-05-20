@@ -49,6 +49,8 @@ def main():
 
     # checkpoint path
     ckpt = '/ceph/project/DAKI4-thermal-2025/P4/runs/ae_complex_full_2/50'
+    ckpt = 'runs/contrastive_full_1/'
+    #ckpt = 'DAWIDD/latest'
     #ckpt = 'Data/temp/50'
 
     # sampling rate (average clips per day)
@@ -136,7 +138,7 @@ def main():
                     torch.save(state, state_path)
                     print(f"Checkpoint saved at index {index}")
                     
-    torch.save(detectors, "DAWIDD/complete_hsic.pickle")
+    torch.save(detectors, "DAWIDD/complete_con_hsic.pickle")
     # use the 'quarterly' detector's history
     #detector = detectors['Daily', 'Ẅeekly', 'Monthly']
     for period, detector in detectors.items():
@@ -168,8 +170,8 @@ def main():
                 'hsic_val': hsic_vals,
                 'p_value': p_vals
             })
-        df.to_csv(f'{period}_ranks_hsic.csv', index=False)
-        print(f"Wrote {period}_ranks_hsic.csv ({len(df)} rows)")
+        df.to_csv(f'{period}_ranks_hsic_con.csv', index=False)
+        print(f"Wrote {period}_ranks_hsic_con.csv ({len(df)} rows)")
 
 
 if __name__ == '__main__':

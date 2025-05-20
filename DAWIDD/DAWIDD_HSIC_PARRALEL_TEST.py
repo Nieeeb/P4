@@ -11,6 +11,7 @@ if BASE_DIR not in sys.path:
 
 # now this will work:
 from nets.autoencoder import ConvAutoencoder
+from utils.modeltools import load_latest_contrastive
 
 # ---- HSIC machinery (unchanged) ----
 
@@ -119,13 +120,19 @@ class DAWIDD_HSIC:
             device = 'cuda:0'
         self.device = torch.device(device)
 
-        model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
-        ckpt = torch.load(ckpt_path, map_location=device)
-        raw = ckpt.get('model', ckpt)
-        stripped = {k.replace('module.', ''): v for k, v in raw.items()}
-        model.load_state_dict(stripped)
+        model, _, _, _ = load_latest_contrastive(ckpt_path)
+        model.to(self.device)
         model.eval()
-        self.encoder = model.encoder
+        
+        self.encoder = model.net
+        
+        #model = ConvAutoencoder(nc=nc, nfe=nfe, nfd=nfd, nz=nz).to(self.device)
+        #ckpt = torch.load(ckpt_path, map_location=device)
+        #raw = ckpt.get('model', ckpt)
+        #stripped = {k.replace('module.', ''): v for k, v in raw.items()}
+        #model.load_state_dict(stripped)
+        #model.eval()
+        #self.encoder = model.encoder
 
         # sliding-window params
         self.max_window_size = max_window_size
