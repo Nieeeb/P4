@@ -62,12 +62,12 @@ def main():
     # How often to save
     save_interval = 100
     
-    if os.path.isfile(state_path):
-        state = torch.load(state_path)
-        print(f"Checkpoint found, starting from index {state['index']}")
-    else:
-        print("Checkpoint not found, creating blank state")
-
+    #if os.path.isfile(state_path):
+    #    state = torch.load(state_path)
+    #    print(f"Checkpoint found, starting from index {state['index']}")
+    #else:
+    #    print("Checkpoint not found, creating blank state")
+    if True:
         # build detector (single key 'quarterly')
         detectors = {
             'Daily': DAWIDD_HSIC(
