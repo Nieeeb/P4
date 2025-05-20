@@ -129,16 +129,16 @@ def main():
                 for det in detectors.values():
                     det.add_batch(z_batch)
                     
-                if index % save_interval == 0 and index != starting_index:
-                    state = {
-                        'index': index,
-                        'detectors': detectors,
-                        'encoder': encoder
-                        }
-                    torch.save(state, state_path)
-                    print(f"Checkpoint saved at index {index}")
+                #if index % save_interval == 0 and index != starting_index:
+                    #state = {
+                    #    'index': index,
+                    #    'detectors': detectors,
+                    #    'encoder': encoder
+                    #    }
+                    #torch.save(state, state_path)
+                    #print(f"Checkpoint saved at index {index}")
                     
-    torch.save(detectors, "DAWIDD/complete_con_hsic.pickle")
+    #torch.save(detectors, "DAWIDD/complete_con_hsic.pickle")
     # use the 'quarterly' detector's history
     #detector = detectors['Daily', 'Ẅeekly', 'Monthly']
     for period, detector in detectors.items():
