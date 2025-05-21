@@ -175,11 +175,11 @@ def load_or_create_contrastive(args):
             
         return learner, optimizer, scheduler, starting_epoch
 
-def load_latest_clusters(path: str, device):
+def load_latest_clusters(path: str):
     assert Path(path).exists()
-    d = torch.device(device)
+    #d = torch.device(device)
     state_path = os.path.join(path, 'latest')
-    states = torch.load(state_path, weights_only=False, map_location=d)
+    states = torch.load(state_path, weights_only=False)
     return states
 
 def save_current_cluster(states: dict, path: str, model: torch.nn.Module, optimizer: torch.optim.Adam, scheduler: torch.optim.lr_scheduler.StepLR, epoch: int):
@@ -208,7 +208,9 @@ def save_current_cluster(states: dict, path: str, model: torch.nn.Module, optimi
 def load_current_cluster(states):
     current_cluster = states['current_cluster']
     model = yolo_v8_m(num_classes=4).cuda()
-    model = torch.nn.parallel.DistributedDataParallel(model)
+    local_rank = int(os.getenv('LOCAL_RANK', 0))
+    model.to(local_rank)
+    model = torch.nn.parallel.DistributedDataParallel(model).to(local_rank)
     model.load_state_dict(state_dict=states['clusters'][current_cluster]['model'])
     
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -254,7 +256,7 @@ def load_or_create_clusters(args, params):
     n_clusters = params['n_clusters']
     checkpoint_path = params.get('checkpoint_path')
     if check_checkpoint(checkpoint_path):
-        states = load_latest_clusters(checkpoint_path, args.local_rank)
+        states = load_latest_clusters(checkpoint_path)
         print(f"Checkpoint found, starting from cluster {states['current_cluster']}\nStarting from epoch {states['clusters'][states['current_cluster']]['epoch'] + 1}")
     else:
         print("No checkpoint found, starting new training")
