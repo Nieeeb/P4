@@ -185,6 +185,9 @@ def train(rank, args, params):
             
             if starting_epoch >= params.get('epochs'):
                 print(f"CLUSTER: {cluster} -- Already trained for {starting_epoch} epochs.")
+                del model
+                del optimizer
+                del scheduler
                 continue
             
             criterion = util.ComputeLoss(model, params)
