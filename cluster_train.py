@@ -179,7 +179,9 @@ def train(rank, args, params):
 
         n_clusters = params['n_clusters']
         
-        for cluster in range(n_clusters):
+        starting_cluster = states['current_cluster']
+        
+        for cluster in range(starting_cluster, n_clusters):
             states['current_cluster'] = cluster
             model, optimizer, scheduler, starting_epoch = load_current_cluster(states)
             
