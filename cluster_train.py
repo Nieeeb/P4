@@ -192,6 +192,8 @@ def train(rank, args, params):
                 del scheduler
                 continue
             
+            model.to(args.local_rank)
+            
             criterion = util.ComputeLoss(model, params)
             
             path_prefix = params['path_prefix']
