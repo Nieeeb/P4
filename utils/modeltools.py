@@ -10,6 +10,7 @@ from MoCo.Moco import MoCo
 from MoCo.Dataset import Encoder
 import copy
 from Contrastive_Learner.contrastivelearner import ContrastiveLearner
+from tqdm import tqdm
 #from contrastive_learner.contrastive_helpers.py import load
 
 # Method for saving trainign state to a given path
@@ -174,10 +175,11 @@ def load_or_create_contrastive(args):
             
         return learner, optimizer, scheduler, starting_epoch
 
-def load_latest_clusters(path: str):
+def load_latest_clusters(path: str, device):
     assert Path(path).exists()
+    d = torch.device(device)
     state_path = os.path.join(path, 'latest')
-    states = torch.load(state_path, weights_only=False)
+    states = torch.load(state_path, weights_only=False, map_location=d)
     return states
 
 def save_current_cluster(states: dict, path: str, model: torch.nn.Module, optimizer: torch.optim.Adam, scheduler: torch.optim.lr_scheduler.StepLR, epoch: int):
@@ -231,13 +233,28 @@ def load_current_cluster(states):
         'epoch': None
     }
     
+def load_saved_cluster_models(path: str):
+    assert check_checkpoint(path)
+    states = load_latest_clusters(path)
     
+    models = []
+    
+    for n, state in tqdm(enumerate(states['clusters']), desc="Loading Models", total=len(states['clusters'])):
+        states['current_cluster'] = n
+        model, opt, sche, epoch = load_current_cluster(states)
+        del opt, sche, epoch
+        model.half()
+        model.eval()
+        model.cpu()
+        models.append(model)
+    
+    return models
 
 def load_or_create_clusters(args, params):
     n_clusters = params['n_clusters']
     checkpoint_path = params.get('checkpoint_path')
     if check_checkpoint(checkpoint_path):
-        states = load_latest_clusters(checkpoint_path)
+        states = load_latest_clusters(checkpoint_path, args.local_rank)
         print(f"Checkpoint found, starting from cluster {states['current_cluster']}\nStarting from epoch {states['clusters'][states['current_cluster']]['epoch'] + 1}")
     else:
         print("No checkpoint found, starting new training")
