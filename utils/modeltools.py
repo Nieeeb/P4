@@ -208,9 +208,9 @@ def save_current_cluster(states: dict, path: str, model: torch.nn.Module, optimi
 def load_current_cluster(states):
     current_cluster = states['current_cluster']
     model = yolo_v8_m(num_classes=4).cuda()
-    local_rank = int(os.getenv('LOCAL_RANK', 0))
+    #local_rank = int(os.getenv('LOCAL_RANK', 0))
     #model.to(local_rank)
-    model = torch.nn.parallel.DistributedDataParallel(model).to(local_rank)
+    model = torch.nn.parallel.DistributedDataParallel(model) #.to(local_rank)
     model.load_state_dict(state_dict=states['clusters'][current_cluster]['model'])
     
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
