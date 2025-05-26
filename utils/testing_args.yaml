@@ -1,0 +1,20 @@
+online: False
+batch_size: 50
+input_size: 384
+val_imgs: "Data/images/test/"
+checkpoint_path: "final_models/mlp_256_models" #"final_models/ae_pca_cluster_models" 
+embedding_path: 'final_models/mlp_encodings.csv'
+encoder_ckpt: 'final_models/mlp_encoder'
+encoder_type: 'mlp'   #'ae' #'random' #'mlp'
+do_pca: False
+result_path: 'final_models/mlp_256_results.csv'
+single_model: False
+
+
+# /ceph/project/DAKI4-thermal-2025/Data/images/test/20210227_clip_5_1544_image_0032.jpg
+# classes
+names:
+  0: person
+  1: bicycle
+  2: car
+  3: motorcycle
