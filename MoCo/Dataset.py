@@ -189,10 +189,14 @@ def main():
             optimizer.zero_grad()
             q = q.to(device)
             k = k.to(device)
-
-            embeddings, logits, labels = moco_model(q, k)
+            
+            #print(q.shape)
+            #print(k.shape)
+            
+            embeddings, logits, labels = moco_model(q, k)        
             
             loss = loss_fn(logits, labels)
+            return
             
             loss.backward()
             

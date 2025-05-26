@@ -62,6 +62,9 @@ def train_learner(args):
                 })
                 
             del loss
+            
+            if batchidx > 10:
+                break
         
         scheduler.step()
         

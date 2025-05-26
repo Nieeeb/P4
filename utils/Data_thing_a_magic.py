@@ -288,12 +288,12 @@ def write_relative_jpg_paths(dataloader, output_txt_path):
 
 
 if __name__ == "__main__":
-    dataloader = DataThingAMagic(period_begin="20100515", 
-                                 period_end="20300521", 
-                                 data_directory="Data/images/valid",
+    dataloader = DataThingAMagic(period_begin="20190201", 
+                                 period_end="20230301", 
+                                 data_directory="Data/images/test",
                                  json_directory="/home/nieb/Projects/Big Data/Images/Seasons_drift/v2/harborfrontv2/Valid.json",
-                                 total_files=1000000000000,
+                                 total_files=1000000,
                                  data_split="test1")
 
 
-    write_relative_jpg_paths(dataloader, "Data/valid.txt")
+    write_relative_jpg_paths(dataloader, "Data/test.txt")

@@ -236,17 +236,31 @@ def load_current_cluster(states):
     }
     
 def load_saved_cluster_models(path: str):
-    assert check_checkpoint(path)
-    states = load_latest_clusters(path)
+    assert Path(path).exists()
+    states = torch.load(path, weights_only=False)
     
     models = []
     
     for n, state in tqdm(enumerate(states['clusters']), desc="Loading Models", total=len(states['clusters'])):
-        states['current_cluster'] = n
-        model, opt, sche, epoch = load_current_cluster(states)
-        del opt, sche, epoch
-        model.half()
-        model.eval()
+        #states['current_cluster'] = n
+        #model, opt, sche, epoch = load_current_cluster(states)
+        #del opt, sche, epoch
+        
+        model = yolo_v8_m(num_classes=4).cuda()
+        #local_rank = int(os.getenv('LOCAL_RANK', 0))
+        #model.to(local_rank)
+        #model = torch.nn.parallel.DistributedDataParallel(model) #.to(local_rank)
+        state_dict=state['model']
+        
+        new_state_dict = OrderedDict()
+        for key, value in state_dict.items():
+            new_key = key[7:] 
+            new_state_dict[new_key] = value
+        
+        model.load_state_dict(new_state_dict)
+        
+        #model.half()
+        #model.eval()
         model.cpu()
         models.append(model)
     
@@ -364,6 +378,22 @@ def load_or_create_dasr(args):
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args['step_size'], last_epoch=-1)
             
         return model, optimizer, scheduler, starting_epoch
+
+def load_single_model(path):
+    assert Path(path).exists()
+    state = torch.load(path, weights_only=False)
+    
+    state_dict = state['model']
+    
+    new_state_dict = OrderedDict()
+    for key, value in state_dict.items():
+        new_key = key[7:] 
+        new_state_dict[new_key] = value
+    
+    model = yolo_v8_m(num_classes=4)
+    model.load_state_dict(state_dict=new_state_dict)
+    
+    return [model]
 
 def load_checkpoint_for_evaluation(args, params):
     checkpoint_path = params.get('checkpoint_path')

@@ -140,7 +140,7 @@ def validate_epoch(args, params, model, validation_loader, validation_sampler, c
             elif model_type == "deep_ae":
                 vloss = criterion(outputs, samples)
             
-            torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG) # Syncs loss and takes the average across GPUs
+            #torch.distributed.reduce(vloss, torch.distributed.ReduceOp.AVG) # Syncs loss and takes the average across GPUs
             v_loss.update(vloss.item(), samples.size(0))
             
             del outputs
